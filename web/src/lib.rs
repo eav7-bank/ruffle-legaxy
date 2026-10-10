@@ -1415,3 +1415,74 @@ fn global_init() {
 
     tracing::info!("Ruffle WASM module has been initialized");
 }
+
+// ===== Medicao de memoria (Naruto Legaxy) =====
+// Alocador global que soma/subtrai cada alocacao em `ruffle_core::memoria_n7` (heap vivo real,
+// usado tambem em `System.totalMemory`) e funcoes lidas pela pagina (`instance.exports.n7_*`).
+mod alocador_n7 {
+    use ruffle_core::memoria_n7 as m;
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::Ordering;
+
+    pub struct AlocadorContador;
+
+    unsafe impl GlobalAlloc for AlocadorContador {
+        unsafe fn alloc(&self, l: Layout) -> *mut u8 {
+            let p = unsafe { System.alloc(l) };
+            if p.is_null() {
+                m::ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
+            } else {
+                m::somar_heap(l.size());
+            }
+            p
+        }
+        unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
+            let p = unsafe { System.alloc_zeroed(l) };
+            if p.is_null() {
+                m::ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
+            } else {
+                m::somar_heap(l.size());
+            }
+            p
+        }
+        unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
+            unsafe { System.dealloc(p, l) };
+            m::subtrair_heap(l.size());
+        }
+        unsafe fn realloc(&self, p: *mut u8, l: Layout, novo: usize) -> *mut u8 {
+            let q = unsafe { System.realloc(p, l, novo) };
+            if q.is_null() {
+                m::ALOC_FALHOU.store(novo, Ordering::Relaxed);
+            } else {
+                m::subtrair_heap(l.size());
+                m::somar_heap(novo);
+            }
+            q
+        }
+    }
+
+    #[global_allocator]
+    static ALOCADOR: AlocadorContador = AlocadorContador;
+}
+
+/// Contadores de memoria, na ordem: heap vivo, pico do heap, ultima alocacao que falhou,
+/// BitmapData vivos, bytes de pixels proprios, BitmapData criados, dispose(), simbolos
+/// decodificados, simbolos reaproveitados, texturas registradas.
+#[wasm_bindgen]
+pub fn n7_memoria(i: u32) -> f64 {
+    use ruffle_core::memoria_n7 as m;
+    use std::sync::atomic::Ordering::Relaxed;
+    match i {
+        0 => m::HEAP_VIVO.load(Relaxed) as f64,
+        1 => m::HEAP_PICO.load(Relaxed) as f64,
+        2 => m::ALOC_FALHOU.load(Relaxed) as f64,
+        3 => m::BMP_VIVOS.load(Relaxed) as f64,
+        4 => m::BMP_BYTES.load(Relaxed) as f64,
+        5 => m::BMP_CRIADOS.load(Relaxed) as f64,
+        6 => m::BMP_DISPOSE.load(Relaxed) as f64,
+        7 => m::SIMBOLOS_DECODIFICADOS.load(Relaxed) as f64,
+        8 => m::SIMBOLOS_REAPROVEITADOS.load(Relaxed) as f64,
+        9 => m::TEXTURAS_REGISTRADAS.load(Relaxed) as f64,
+        _ => -1.0,
+    }
+}

@@ -1,4 +1,5 @@
 use crate::avm2::object::BitmapDataObject;
+use crate::memoria_n7::ContadorBitmap;
 use crate::context::RenderContext;
 use crate::display_object::{BoundsMode, DisplayObject, DisplayObjectWeak, TDisplayObject};
 use bitflags::bitflags;
@@ -417,6 +418,10 @@ pub struct BitmapRawData<'gc> {
     #[collect(require_static)]
     dirty_state: DirtyState,
 
+    /// Contador de memoria (crate::memoria_n7).
+    #[collect(require_static)]
+    contador: ContadorBitmap,
+
     /// Holds an egui texture handle, used for rendering this Bitmap in the debug ui.
     /// This is automatically set to `None` when the texture is updated (either from
     /// marking the CPU side dirty, or from performing a GPU -> CPU sync).
@@ -438,6 +443,7 @@ pub enum DirtyState {
 
 mod wrapper {
     use crate::avm2::object::BitmapDataObject;
+    use crate::memoria_n7::ContadorBitmap;
     use crate::context::RenderContext;
     use crate::display_object::DisplayObjectWeak;
     use gc_arena::barrier::Write;
@@ -504,6 +510,7 @@ mod wrapper {
                     avm2_object: None,
                     display_objects: vec![],
                     dirty_state: DirtyState::Clean,
+                    contador: ContadorBitmap::new(0),
                     #[cfg(feature = "egui")]
                     egui_texture: Default::default(),
                 }
@@ -528,6 +535,7 @@ mod wrapper {
                 display_objects: vec![],
                 // We have no GPU texture, so there's no need to mark as dirty
                 dirty_state: DirtyState::Clean,
+                contador: ContadorBitmap::new(data.pixels.len() as u64 * 4),
                 #[cfg(feature = "egui")]
                 egui_texture: Default::default(),
             }
@@ -763,6 +771,7 @@ impl<'gc> BitmapRawData<'gc> {
             avm2_object: None,
             display_objects: vec![],
             dirty_state: DirtyState::Clean,
+            contador: ContadorBitmap::new(width as u64 * height as u64 * 4),
             #[cfg(feature = "egui")]
             egui_texture: Default::default(),
         }
@@ -775,6 +784,7 @@ impl<'gc> BitmapRawData<'gc> {
         pixels: Vec<Color>,
     ) -> Self {
         Self {
+            contador: ContadorBitmap::new(pixels.len() as u64 * 4),
             pixels,
             width,
             height,
@@ -797,6 +807,7 @@ impl<'gc> BitmapRawData<'gc> {
         self.width = 0;
         self.height = 0;
         self.pixels = Vec::new(); // free the CPU pixel buffer
+        self.contador.dispose();
         self.bitmap_handle = None;
         // There's no longer a handle to update
         self.dirty_state = DirtyState::Clean;
@@ -819,6 +830,7 @@ impl<'gc> BitmapRawData<'gc> {
         );
         let bitmap_handle = renderer.register_bitmap(bitmap);
         if let Ok(ref handle) = bitmap_handle {
+            crate::memoria_n7::contar(&crate::memoria_n7::TEXTURAS_REGISTRADAS);
             self.dirty_state = DirtyState::Clean;
             self.bitmap_handle = Some(handle.clone());
         }

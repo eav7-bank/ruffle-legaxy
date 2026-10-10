@@ -225,6 +225,22 @@ bitflags! {
 #[collect(no_drop)]
 pub struct BitmapData<'gc>(BitmapRawDataWrapper<'gc>);
 
+/// Os pixels de um `BitmapData` ficam fora do gc-arena (num `Vec`), entao o GC enxerga cada bitmap
+/// como um unico objeto pequeno. Num jogo que cria muitos `BitmapData` grandes e os descarta (ex.:
+/// `new ClasseDoQuadro()` a cada quadro de efeito), o coletor dormia enquanto centenas de MB de
+/// pixels mortos se acumulavam, ate o wasm bater 4 GiB e falhar a alocacao ("unreachable").
+/// Aqui cobramos do GC uma divida proporcional ao tamanho dos pixels (1 unidade a cada 64 bytes),
+/// para que a coleta acompanhe a memoria realmente alocada.
+pub(crate) const BYTES_POR_UNIDADE_DE_DIVIDA: f64 = 64.0;
+
+#[inline]
+pub(crate) fn cobrar_divida_pixels(mc: &Mutation<'_>, width: u32, height: u32) {
+    let bytes = (width as f64) * (height as f64) * 4.0;
+    if bytes > 0.0 {
+        mc.metrics().adjust_debt(bytes / BYTES_POR_UNIDADE_DE_DIVIDA);
+    }
+}
+
 impl<'gc> BitmapData<'gc> {
     pub fn new(
         mc: &Mutation<'gc>,
@@ -233,6 +249,7 @@ impl<'gc> BitmapData<'gc> {
         transparency: bool,
         fill_color: u32,
     ) -> Self {
+        cobrar_divida_pixels(mc, width, height);
         let data = BitmapRawData::new(width, height, transparency, fill_color);
         let data = BitmapRawDataWrapper::new(Gc::new(mc, data.into()));
 
@@ -246,6 +263,7 @@ impl<'gc> BitmapData<'gc> {
         transparency: bool,
         pixels: Vec<Color>,
     ) -> Self {
+        cobrar_divida_pixels(mc, width, height);
         let data = BitmapRawData::new_with_pixels(width, height, transparency, pixels);
         let data = BitmapRawDataWrapper::new(Gc::new(mc, data.into()));
 
@@ -262,6 +280,7 @@ impl<'gc> BitmapData<'gc> {
         renderer: &mut dyn RenderBackend,
     ) -> BitmapData<'gc> {
         let data = self.0.clone_data(renderer);
+        cobrar_divida_pixels(mc, data.width(), data.height());
         let data = BitmapRawDataWrapper::new(Gc::new(mc, data.into()));
         Self(data)
     }

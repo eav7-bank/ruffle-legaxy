@@ -1483,6 +1483,18 @@ pub fn n7_memoria(i: u32) -> f64 {
         7 => m::SIMBOLOS_DECODIFICADOS.load(Relaxed) as f64,
         8 => m::SIMBOLOS_REAPROVEITADOS.load(Relaxed) as f64,
         9 => m::TEXTURAS_REGISTRADAS.load(Relaxed) as f64,
+        10 => m::LEITURAS_TOTAL_MEMORY.load(Relaxed) as f64,
+        11 => m::fator_coleta_por_quadro(),
         _ => -1.0,
     }
+}
+
+/// Ajusta a divida de GC por quadro (fracao dos objetos vivos; 0 desliga). Devolve o valor atual.
+#[wasm_bindgen]
+pub fn n7_fator_coleta(valor: f64) -> f64 {
+    use ruffle_core::memoria_n7 as m;
+    if valor >= 0.0 {
+        m::FATOR_COLETA_POR_QUADRO.store(valor.to_bits(), std::sync::atomic::Ordering::Relaxed);
+    }
+    m::fator_coleta_por_quadro()
 }

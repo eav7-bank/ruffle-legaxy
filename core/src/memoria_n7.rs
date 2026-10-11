@@ -82,3 +82,14 @@ impl Drop for ContadorBitmap {
         BMP_BYTES.fetch_sub(self.0, Ordering::Relaxed);
     }
 }
+
+/// Divida de GC por quadro, em fracao do numero de objetos vivos (bits de f64). Padrao 0,004
+/// (~1 ciclo completo a cada 10 s a 30 fps). 0 desliga.
+pub static FATOR_COLETA_POR_QUADRO: AtomicU64 = AtomicU64::new(0x3F70624DD2F1A9FC);
+/// Leituras de `System.totalMemory` pelo conteudo.
+pub static LEITURAS_TOTAL_MEMORY: AtomicU64 = AtomicU64::new(0);
+
+#[inline]
+pub fn fator_coleta_por_quadro() -> f64 {
+    f64::from_bits(FATOR_COLETA_POR_QUADRO.load(Ordering::Relaxed))
+}

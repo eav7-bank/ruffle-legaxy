@@ -2055,6 +2055,18 @@ impl Player {
 
     #[instrument(level = "debug", skip_all)]
     pub fn run_frame(&mut self) {
+        // Coleta continua (Naruto Legaxy): o gc-arena so comeca um ciclo novo depois de muitas
+        // alocacoes de objetos; com o jogo parado (cidade), os bitmaps que o jogo larga ao sair da
+        // luta ficavam vivos por minutos. Uma pequena divida por quadro garante um ciclo completo
+        // a cada ~10 s (a 30 fps), devolvendo a memoria ao nivel de antes da luta.
+        {
+            let arena = self.gc_arena.borrow();
+            let m = arena.metrics();
+            let fator = crate::memoria_n7::fator_coleta_por_quadro();
+            if fator > 0.0 {
+                m.adjust_debt(m.total_gc_count() as f64 * fator);
+            }
+        }
         let frame_time = self.frame_time(750_000_000.0);
         let frame_time = Duration::from_nanos(frame_time as u64);
         let (mut execution_limit, may_execute_while_streaming) = match self.load_behavior {

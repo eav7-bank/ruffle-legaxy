@@ -1,4 +1,7 @@
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
+use std::sync::{Arc, Weak};
+
+use crate::bitmap::bitmap_data::{Color, TexturaCompartilhada};
 
 use crate::backend::audio::SoundHandle;
 use crate::binary_data::BinaryData;
@@ -39,6 +42,10 @@ pub struct BitmapCharacter<'gc> {
     /// A lazily constructed GPU handle, used when performing fills with this bitmap
     #[collect(require_static)]
     handle: OnceCell<BitmapHandle>,
+    /// Pixels ja decodificados, compartilhados (copy-on-write) por todas as instancias vivas
+    /// criadas a partir deste simbolo. `Weak`: sem instancia viva, a memoria e liberada.
+    #[collect(require_static)]
+    compartilhado: RefCell<PixelsDoSimbolo>,
     /// The bitmap class set by `SymbolClass` - this is used when we instantaite
     /// a `Bitmap` displayobject.
     avm2_class: Lock<BitmapClass<'gc>>,
@@ -49,12 +56,59 @@ impl<'gc> BitmapCharacter<'gc> {
         Self {
             compressed,
             handle: OnceCell::default(),
+            compartilhado: RefCell::new(PixelsDoSimbolo::default()),
             avm2_class: Lock::new(BitmapClass::NoSubclass),
         }
     }
 
     pub fn compressed(&self) -> &CompressedBitmap {
         &self.compressed
+    }
+
+    /// Pixels decodificados deste simbolo, compartilhados entre as instancias vivas (decodifica
+    /// so quando nao ha nenhuma viva).
+    pub fn pixels_compartilhados(&self) -> Result<SimboloDecodificado, RenderError> {
+        let mut c = self.compartilhado.borrow_mut();
+        if let Some(pixels) = c.pixels.upgrade() {
+            let textura = match c.textura.upgrade() {
+                Some(t) => t,
+                None => {
+                    let t = Arc::new(TexturaCompartilhada::default());
+                    c.textura = Arc::downgrade(&t);
+                    t
+                }
+            };
+            crate::memoria_n7::contar(&crate::memoria_n7::SIMBOLOS_REAPROVEITADOS);
+            return Ok(SimboloDecodificado {
+                pixels,
+                textura,
+                width: c.width,
+                height: c.height,
+                transparente: c.transparente,
+                decodificou: false,
+            });
+        }
+        let decoded = self.compressed.decode()?;
+        let transparente = !matches!(decoded.format(), ruffle_render::bitmap::BitmapFormat::Rgb);
+        let (width, height) = (decoded.width(), decoded.height());
+        let pixels: Arc<Vec<Color>> = Arc::new(decoded.as_colors().map(Color::from).collect());
+        let textura = Arc::new(TexturaCompartilhada::default());
+        *c = PixelsDoSimbolo {
+            pixels: Arc::downgrade(&pixels),
+            textura: Arc::downgrade(&textura),
+            width,
+            height,
+            transparente,
+        };
+        crate::memoria_n7::contar(&crate::memoria_n7::SIMBOLOS_DECODIFICADOS);
+        Ok(SimboloDecodificado {
+            pixels,
+            textura,
+            width,
+            height,
+            transparente,
+            decodificou: true,
+        })
     }
 
     pub fn avm2_class(&self) -> BitmapClass<'gc> {
@@ -79,6 +133,34 @@ impl<'gc> BitmapCharacter<'gc> {
         self.handle.set(new_handle.clone()).unwrap();
         Ok(new_handle)
     }
+}
+
+/// Cache fraco dos pixels decodificados de um simbolo de bitmap.
+#[derive(Default)]
+struct PixelsDoSimbolo {
+    pixels: Weak<Vec<Color>>,
+    textura: Weak<TexturaCompartilhada>,
+    width: u32,
+    height: u32,
+    transparente: bool,
+}
+
+impl std::fmt::Debug for PixelsDoSimbolo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PixelsDoSimbolo")
+            .field("vivo", &(self.pixels.strong_count() > 0))
+            .finish()
+    }
+}
+
+/// Pixels de um simbolo prontos para uma instancia (ver `BitmapCharacter::pixels_compartilhados`).
+pub struct SimboloDecodificado {
+    pub pixels: Arc<Vec<Color>>,
+    pub textura: Arc<TexturaCompartilhada>,
+    pub width: u32,
+    pub height: u32,
+    pub transparente: bool,
+    pub decodificou: bool,
 }
 
 /// Holds a bitmap from an SWF tag, plus the decoded width/height.

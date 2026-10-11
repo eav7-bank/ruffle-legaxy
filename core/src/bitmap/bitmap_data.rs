@@ -10,9 +10,10 @@ use ruffle_render::bitmap::{
     Bitmap, BitmapFormat, BitmapHandle, PixelRegion, PixelSnapping, SyncHandle,
 };
 use ruffle_wstr::WStr;
-use std::cell::Ref;
+use std::cell::{OnceCell, Ref};
 use std::fmt::Debug;
 use std::ops::Range;
+use std::sync::Arc;
 use swf::{Rectangle, Twips};
 use tracing::instrument;
 
@@ -242,7 +243,30 @@ pub(crate) fn cobrar_divida_pixels(mc: &Mutation<'_>, width: u32, height: u32) {
     }
 }
 
+/// Textura da GPU de um simbolo de bitmap, compartilhada pelas instancias de `BitmapData` que
+/// ainda tem exatamente os pixels do simbolo (sem escrita). Some quando a ultima instancia morre.
+#[derive(Default, Debug)]
+pub struct TexturaCompartilhada {
+    handle: OnceCell<BitmapHandle>,
+}
+
 impl<'gc> BitmapData<'gc> {
+    /// `BitmapData` de um simbolo da biblioteca: aponta para os pixels ja decodificados do simbolo
+    /// (copy-on-write) e usa a textura da GPU compartilhada enquanto nao houver escrita.
+    pub fn new_compartilhado(
+        mc: &Mutation<'gc>,
+        width: u32,
+        height: u32,
+        transparency: bool,
+        pixels: Arc<Vec<Color>>,
+        textura: Arc<TexturaCompartilhada>,
+    ) -> Self {
+        let data = BitmapRawData::new_compartilhado(width, height, transparency, pixels, textura);
+        let data = BitmapRawDataWrapper::new(Gc::new(mc, data.into()));
+
+        Self(data)
+    }
+
     pub fn new(
         mc: &Mutation<'gc>,
         width: u32,
@@ -296,6 +320,15 @@ impl<'gc> BitmapData<'gc> {
         renderer: &mut dyn RenderBackend,
     ) -> BitmapHandle {
         self.0.bitmap_handle(gc_context, renderer)
+    }
+
+    /// Como `bitmap_handle`, mas para ESCREVER na GPU (nunca devolve a textura compartilhada).
+    pub fn bitmap_handle_escrita(
+        &self,
+        gc_context: &Mutation<'gc>,
+        renderer: &mut dyn RenderBackend,
+    ) -> BitmapHandle {
+        self.0.bitmap_handle_escrita(gc_context, renderer)
     }
 
     pub fn overwrite_cpu_pixels_from_gpu(
@@ -388,7 +421,12 @@ impl<'gc> BitmapData<'gc> {
 pub struct BitmapRawData<'gc> {
     /// The pixels in the bitmap, stored as a array of pre-multiplied ARGB colour values
     #[collect(require_static)]
-    pixels: Vec<Color>,
+    pixels: Arc<Vec<Color>>,
+
+    /// Enquanto `Some`, os pixels sao os do simbolo (sem escrita) e `bitmap_handle`, se houver,
+    /// e a textura compartilhada do simbolo — nunca pode ser alvo de escrita.
+    #[collect(require_static)]
+    textura_compartilhada: Option<Arc<TexturaCompartilhada>>,
 
     width: u32,
     height: u32,
@@ -444,6 +482,7 @@ pub enum DirtyState {
 mod wrapper {
     use crate::avm2::object::BitmapDataObject;
     use crate::memoria_n7::ContadorBitmap;
+    use std::sync::Arc;
     use crate::context::RenderContext;
     use crate::display_object::DisplayObjectWeak;
     use gc_arena::barrier::Write;
@@ -501,7 +540,8 @@ mod wrapper {
             BitmapRawDataWrapper(Gc::new(
                 mc,
                 BitmapRawData {
-                    pixels: Vec::new(),
+                    pixels: Arc::new(Vec::new()),
+                    textura_compartilhada: None,
                     width: 0,
                     height: 0,
                     transparency: false,
@@ -525,7 +565,8 @@ mod wrapper {
             // with no GPU texture
             let data = self.sync(renderer).borrow();
             BitmapRawData {
-                pixels: data.pixels.clone(),
+                pixels: Arc::clone(&data.pixels),
+                textura_compartilhada: None,
                 width: data.width,
                 height: data.height,
                 transparency: data.transparency,
@@ -535,7 +576,8 @@ mod wrapper {
                 display_objects: vec![],
                 // We have no GPU texture, so there's no need to mark as dirty
                 dirty_state: DirtyState::Clean,
-                contador: ContadorBitmap::new(data.pixels.len() as u64 * 4),
+                // pixels compartilhados com a origem: so viram proprios na primeira escrita
+                contador: ContadorBitmap::new(0),
                 #[cfg(feature = "egui")]
                 egui_texture: Default::default(),
             }
@@ -582,6 +624,18 @@ mod wrapper {
             renderer: &mut dyn RenderBackend,
         ) -> BitmapHandle {
             let mut bitmap_data = self.0.borrow_mut(gc_context);
+            bitmap_data.update_dirty_texture(renderer);
+            bitmap_data.bitmap_handle(renderer)
+        }
+
+        /// Como `bitmap_handle`, mas para ESCREVER na GPU: larga a textura compartilhada antes.
+        pub fn bitmap_handle_escrita(
+            &self,
+            gc_context: &Mutation<'gc>,
+            renderer: &mut dyn RenderBackend,
+        ) -> BitmapHandle {
+            let mut bitmap_data = self.0.borrow_mut(gc_context);
+            bitmap_data.desligar_textura_compartilhada();
             bitmap_data.update_dirty_texture(renderer);
             bitmap_data.bitmap_handle(renderer)
         }
@@ -759,10 +813,11 @@ impl std::fmt::Debug for BitmapRawData<'_> {
 impl<'gc> BitmapRawData<'gc> {
     pub fn new(width: u32, height: u32, transparency: bool, fill_color: u32) -> Self {
         Self {
-            pixels: vec![
+            textura_compartilhada: None,
+            pixels: Arc::new(vec![
                 Color::bgra_u32(fill_color).to_premultiplied_alpha(transparency);
                 width as usize * height as usize
-            ],
+            ]),
             width,
             height,
             transparency,
@@ -785,7 +840,8 @@ impl<'gc> BitmapRawData<'gc> {
     ) -> Self {
         Self {
             contador: ContadorBitmap::new(pixels.len() as u64 * 4),
-            pixels,
+            pixels: Arc::new(pixels),
+            textura_compartilhada: None,
             width,
             height,
             transparency,
@@ -799,6 +855,44 @@ impl<'gc> BitmapRawData<'gc> {
         }
     }
 
+    pub fn new_compartilhado(
+        width: u32,
+        height: u32,
+        transparency: bool,
+        pixels: Arc<Vec<Color>>,
+        textura: Arc<TexturaCompartilhada>,
+    ) -> Self {
+        let mut data = Self::new_with_pixels(width, height, transparency, Vec::new());
+        data.pixels = pixels;
+        data.textura_compartilhada = Some(textura);
+        data
+    }
+
+    /// Deixa de usar a textura compartilhada do simbolo (antes de qualquer escrita na GPU ou
+    /// na CPU): a proxima `bitmap_handle` cria uma textura propria.
+    #[inline]
+    pub(crate) fn desligar_textura_compartilhada(&mut self) {
+        if self.textura_compartilhada.take().is_some() {
+            self.bitmap_handle = None;
+        }
+    }
+
+    /// Acesso de escrita aos pixels: copia-na-escrita se estiverem compartilhados.
+    #[inline]
+    fn pixels_mut(&mut self) -> &mut Vec<Color> {
+        self.desligar_textura_compartilhada();
+        if Arc::strong_count(&self.pixels) != 1 || Arc::weak_count(&self.pixels) != 0 {
+            self.contador.definir(self.pixels.len() as u64 * 4);
+        }
+        Arc::make_mut(&mut self.pixels)
+    }
+
+    /// `BitmapHandle` para ESCREVER na GPU (draw, filtros, shaders): nunca a textura compartilhada.
+    pub fn bitmap_handle_escrita(&mut self, renderer: &mut dyn RenderBackend) -> BitmapHandle {
+        self.desligar_textura_compartilhada();
+        self.bitmap_handle(renderer)
+    }
+
     pub fn disposed(&self) -> bool {
         self.disposed
     }
@@ -806,7 +900,8 @@ impl<'gc> BitmapRawData<'gc> {
     pub fn dispose(&mut self) {
         self.width = 0;
         self.height = 0;
-        self.pixels = Vec::new(); // free the CPU pixel buffer
+        self.textura_compartilhada = None;
+        self.pixels = Arc::new(Vec::new()); // free the CPU pixel buffer
         self.contador.dispose();
         self.bitmap_handle = None;
         // There's no longer a handle to update
@@ -820,6 +915,26 @@ impl<'gc> BitmapRawData<'gc> {
     ) -> Result<BitmapHandle, ruffle_render::error::Error> {
         if let Some(ref handle) = self.bitmap_handle {
             return Ok(handle.clone());
+        }
+
+        if let Some(textura) = &self.textura_compartilhada {
+            if let Some(handle) = textura.handle.get() {
+                self.dirty_state = DirtyState::Clean;
+                self.bitmap_handle = Some(handle.clone());
+                return Ok(handle.clone());
+            }
+            let bitmap = Bitmap::new(
+                self.width(),
+                self.height(),
+                BitmapFormat::Rgba,
+                self.pixels_rgba(),
+            );
+            let handle = renderer.register_bitmap(bitmap)?;
+            crate::memoria_n7::contar(&crate::memoria_n7::TEXTURAS_REGISTRADAS);
+            let _ = textura.handle.set(handle.clone());
+            self.dirty_state = DirtyState::Clean;
+            self.bitmap_handle = Some(handle.clone());
+            return Ok(handle);
         }
 
         let bitmap = Bitmap::new(
@@ -910,20 +1025,21 @@ impl<'gc> BitmapRawData<'gc> {
 
     #[inline]
     pub fn set_pixel32_raw(&mut self, x: u32, y: u32, color: Color) {
-        self.pixels[(x + y * self.width) as usize] = color;
+        let i = (x + y * self.width) as usize;
+        self.pixels_mut()[i] = color;
     }
 
     #[inline]
     pub fn set_pixel32_row_raw(&mut self, x1: u32, x2: u32, y: u32, color: Color) {
         let p1 = (x1 + y * self.width) as usize;
         let p2 = (x2 + y * self.width) as usize;
-        let slice = &mut self.pixels[p1..p2];
+        let slice = &mut self.pixels_mut()[p1..p2];
         slice.fill(color);
     }
 
     #[inline]
     pub fn fill(&mut self, color: Color) {
-        self.pixels.fill(color);
+        self.pixels_mut().fill(color);
     }
 
     #[inline]
@@ -932,7 +1048,7 @@ impl<'gc> BitmapRawData<'gc> {
     }
 
     pub fn raw_pixels_mut(&mut self) -> &mut Vec<Color> {
-        &mut self.pixels
+        self.pixels_mut()
     }
 
     pub fn raw_pixels(&self) -> &[Color] {

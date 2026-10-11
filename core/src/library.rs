@@ -236,8 +236,17 @@ impl<'gc> MovieLibrary<'gc> {
         match character {
             Character::Bitmap(bitmap) => {
                 let avm2_class = bitmap.avm2_class();
-                let bitmap = bitmap.compressed().decode().unwrap();
-                let bitmap = Bitmap::new(mc, id, bitmap, self.swf);
+                // pixels decodificados compartilhados entre as instancias vivas do simbolo
+                let d = bitmap.pixels_compartilhados().unwrap();
+                let bitmap_data = crate::bitmap::bitmap_data::BitmapData::new_compartilhado(
+                    mc,
+                    d.width,
+                    d.height,
+                    d.transparente,
+                    d.pixels,
+                    d.textura,
+                );
+                let bitmap = Bitmap::new_with_bitmap_data(mc, id, bitmap_data, true, self.swf);
                 bitmap.set_avm2_bitmapdata_class(mc, avm2_class);
                 Some(bitmap.instantiate(mc).into())
             }

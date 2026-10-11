@@ -1281,7 +1281,7 @@ pub fn apply_filter<'gc>(
     let source_handle = source.bitmap_handle(context.gc(), context.renderer);
     let (target, _) = target.overwrite_cpu_pixels_from_gpu(context.gc());
     let mut write = target.borrow_mut(context.gc());
-    let dest = write.bitmap_handle(context.renderer);
+    let dest = write.bitmap_handle_escrita(context.renderer);
 
     let sync_handle = context.renderer.apply_filter(
         source_handle,
@@ -1529,7 +1529,7 @@ pub fn draw<'gc>(
         render_context.commands.pop_mask();
     }
 
-    let handle = target.bitmap_handle(render_context.gc(), render_context.renderer);
+    let handle = target.bitmap_handle_escrita(render_context.gc(), render_context.renderer);
 
     let commands = if blend_mode == BlendMode::Normal {
         render_context.commands

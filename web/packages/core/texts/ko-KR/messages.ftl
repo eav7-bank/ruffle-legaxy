@@ -7,10 +7,10 @@ more-info = 추가 정보
 run-anyway = 그래도 실행하기
 continue = 계속하기
 report-bug = 버그 제보
-update-ruffle = Ruffle 업데이트
+update-ruffle = Ruffle Legaxy 업데이트
 ruffle-demo = 웹 데모
 ruffle-desktop = 데스크톱 애플리케이션
-ruffle-wiki = Ruffle 위키 보기
+ruffle-wiki = Ruffle Legaxy 위키 보기
 enable-hardware-acceleration = 하드웨어 가속이 비활성화되어 있는 것 같습니다. Ruffle은 계속 작동하지만 매우 느릴 수 있습니다. 아래 링크를 참고하여 하드웨어 가속을 활성화하는 방법을 찾아보세요:
 enable-hardware-acceleration-link = FAQ - 크롬 하드웨어 가속
 view-error-details = 오류 세부 정보 보기
@@ -33,15 +33,15 @@ error-file-protocol =
 error-javascript-config =
     잘못된 자바스크립트 설정으로 인해 Ruffle에서 중대한 문제가 발생했습니다.
     만약 당신이 서버 관리자인 경우, 오류 세부사항을 확인하여 어떤 매개변수가 잘못되었는지 알아보세요.
-    또는 Ruffle 위키를 통해 도움을 받아 볼 수도 있습니다.
+    또는 Ruffle Legaxy 위키를 통해 도움을 받아 볼 수도 있습니다.
 error-wasm-not-found =
     Ruffle이 ".wasm" 필수 파일 구성요소를 로드하지 못했습니다.
     만약 당신이 서버 관리자라면 파일이 올바르게 업로드되었는지 확인하세요.
-    문제가 지속된다면 "publicPath" 옵션을 사용해야 할 수도 있습니다: Ruffle 위키를 참조하여 도움을 받으세요.
+    문제가 지속된다면 "publicPath" 옵션을 사용해야 할 수도 있습니다: Ruffle Legaxy 위키를 참조하여 도움을 받으세요.
 error-wasm-mime-type =
     Ruffle이 초기화를 시도하는 동안 중대한 문제가 발생했습니다.
     이 웹 서버는 올바른 MIME 유형의 ".wasm" 파일을 제공하지 않습니다.
-    만약 당신이 서버 관리자라면 Ruffle 위키를 통해 도움을 받으세요.
+    만약 당신이 서버 관리자라면 Ruffle Legaxy 위키를 통해 도움을 받으세요.
 error-invalid-swf =
     Ruffle이 요청한 파일을 분석하지 못했습니다.
     요청한 파일이 유효한 SWF 파일이 아닐 가능성이 높습니다.
@@ -52,15 +52,15 @@ error-swf-fetch =
 error-swf-cors =
     Ruffle이 플래시 SWF 파일을 로드하는 데 실패하였습니다.
     CORS 정책에 의해 데이터 가져오기에 대한 액세스가 차단되었을 수 있습니다.
-    만약 당신이 서버 관리자라면 Ruffle 위키를 참조하여 도움을 받아볼 수 있습니다.
+    만약 당신이 서버 관리자라면 Ruffle Legaxy 위키를 참조하여 도움을 받아볼 수 있습니다.
 error-wasm-cors =
     Ruffle이 ".wasm" 필수 파일 구성요소를 로드하지 못했습니다.
     CORS 정책에 의해 데이터 가져오기에 대한 액세스가 차단되었을 수 있습니다.
-    만약 당신이 서버 관리자라면 Ruffle 위키를 참조하여 도움을 받아볼 수 있습니다.
+    만약 당신이 서버 관리자라면 Ruffle Legaxy 위키를 참조하여 도움을 받아볼 수 있습니다.
 error-wasm-invalid =
     Ruffle이 초기화를 시도하는 동안 중대한 문제가 발생했습니다.
     이 페이지에 Ruffle을 실행하기 위한 파일이 누락되었거나 잘못된 것 같습니다.
-    만약 당신이 서버 관리자라면 Ruffle 위키를 참조하여 도움을 받아볼 수 있습니다.
+    만약 당신이 서버 관리자라면 Ruffle Legaxy 위키를 참조하여 도움을 받아볼 수 있습니다.
 error-wasm-download =
     Ruffle이 초기화를 시도하는 동안 중대한 문제가 발생했습니다.
     이 문제는 때때로 바로 해결될 수 있으므로 페이지를 새로고침하여 다시 시도해보세요.
@@ -81,7 +81,7 @@ error-javascript-conflict-outdated = 또한 Ruffle의 최신 버전을 업로드
 error-csp-conflict =
     Ruffle이 초기화를 시도하는 동안 중대한 문제가 발생했습니다.
     이 웹 서버의 CSP(Content Security Policy) 정책이 ".wasm" 필수 구성요소를 실행하는 것을 허용하지 않습니다.
-    만약 당신이 서버 관리자라면 Ruffle 위키를 참조하여 도움을 받아볼 수 있습니다.
+    만약 당신이 서버 관리자라면 Ruffle Legaxy 위키를 참조하여 도움을 받아볼 수 있습니다.
 error-unknown =
     Ruffle이 플래시 콘텐츠를 표시하려고 시도하는 동안 중대한 문제가 발생했습니다.
     { $outdated ->

@@ -1,3 +1,15 @@
+# Ruffle Legaxy 0.0.1
+
+Versão própria do Ruffle para o **Naruto Legaxy** — https://naruto.legaxygames.com/play/ruffle-legaxy.html
+(código: https://github.com/eav7-bank/ruffle-legaxy).
+
+Baseado no **Ruffle** (https://ruffle.rs), licenças **MIT** e **Apache-2.0** — os textos estão em
+`LICENSE_MIT` e `LICENSE_APACHE` neste pacote. Copyright (c) 2018 Ruffle LLC <ruffle@ruffle.rs> and Ruffle contributors.
+
+O texto abaixo é o README original do pacote `ruffle-selfhosted`.
+
+---
+
 # ruffle-selfhosted
 
 ruffle-selfhosted is the intended way to get Ruffle onto your website.

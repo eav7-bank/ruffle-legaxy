@@ -12,8 +12,8 @@ report-bug = バグを報告
 update-ruffle = Ruffleを更新
 ruffle-demo = Webデモ
 ruffle-desktop = デスクトップアプリ
-ruffle-wiki = Ruffle Wikiを閲覧
-enable-hardware-acceleration = ハードウェア アクセラレーションが無効になっているようです。Ruffle は動作するかもしれませんが、非常に遅くなる可能性があります。ハードウェア アクセラレーションを有効にする方法については、以下のリンクを参照してください。
+ruffle-wiki = Ruffle Legaxy Wikiを閲覧
+enable-hardware-acceleration = ハードウェア アクセラレーションが無効になっているようです。Ruffle Legaxy は動作するかもしれませんが、非常に遅くなる可能性があります。ハードウェア アクセラレーションを有効にする方法については、以下のリンクを参照してください。
 enable-hardware-acceleration-link = よくある質問 - Chromeのハードウェア アクセラレーション
 view-error-details = エラーの詳細を表示
 open-in-new-tab = 新しいタブで開く
@@ -44,7 +44,7 @@ error-wasm-mime-type =
     このWebサーバーは「.wasm」ファイルを正しいMIMEタイプで提供していません。
     サーバーの管理者は、Ruffleのwikiを参照してください。
 error-invalid-swf =
-    Ruffle はリクエストされたファイルのパースに失敗しました。
+    Ruffle Legaxy はリクエストされたファイルのパースに失敗しました。
     最も考えられる原因は、ファイルが有効な SWF でないことです。
 error-swf-fetch =
     RuffleがFlash SWFファイルの読み込みに失敗しました。
@@ -57,7 +57,7 @@ error-swf-cors =
 error-wasm-cors =
     Ruffleに必要となる「.wasm」ファイルコンポーネントの読み込みに失敗しました。
     CORSポリシーによってfetchへのアクセスがブロックされている可能性があります。
-    サーバーの管理者は、Ruffle wikiを参照してください。
+    サーバーの管理者は、Ruffle Legaxy wikiを参照してください。
 error-wasm-invalid =
     Ruffleの初期化時に重大な問題が発生しました。
     このページにはRuffleを実行するためのファイルが存在しないか、無効なファイルがあるかもしれません。

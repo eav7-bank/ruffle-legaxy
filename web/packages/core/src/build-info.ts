@@ -12,4 +12,6 @@ export const buildInfo = {
     versionChannel: "%VERSION_CHANNEL%",
     buildDate: "%BUILD_DATE%",
     commitHash: "%COMMIT_HASH%",
+    /** Ruffle Legaxy: versao do Ruffle oficial em que esta versao se baseia. */
+    upstreamVersion: "%UPSTREAM_VERSION%",
 };

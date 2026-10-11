@@ -1,7 +1,7 @@
 import { text, textAsParagraphs } from "../i18n.js";
 import { createRef } from "tsx-dom";
 import { buildInfo } from "../../build-info.js";
-import { RUFFLE_ORIGIN } from "../constants.js";
+import { LEGAXY_PAGE } from "../constants.js";
 import {
     InvalidOptionsError,
     InvalidSwfError,
@@ -81,9 +81,10 @@ function createPanicAction({
         url = url.split(/[?#]/, 1)[0]!;
 
         const issueTitle = `Error on ${url}`;
-        let issueLink = `https://github.com/ruffle-rs/ruffle/issues/new?title=${encodeURIComponent(
+        // Ruffle Legaxy: o "reportar" vai para a nossa pagina (nao para o GitHub do Ruffle).
+        let issueLink = `${LEGAXY_PAGE}?erro=${encodeURIComponent(
             issueTitle,
-        )}&template=error_report.md&labels=error-report&body=`;
+        )}&detalhes=`;
         let issueBody = encodeURIComponent(errorText);
         if (
             errorArray.stackIndex > -1 &&
@@ -97,7 +98,7 @@ function createPanicAction({
             }
             issueBody = encodeURIComponent(errorArray.join(""));
         }
-        issueLink += issueBody;
+        issueLink += issueBody + "#reportar";
         return (
             <li>
                 <a href={issueLink} target="_top">
@@ -126,19 +127,19 @@ type ErrorArray = Array<string | null> & {
 export const CommonActions = {
     OpenDemo: {
         type: "open_link",
-        url: RUFFLE_ORIGIN + "/demo",
+        url: LEGAXY_PAGE,
         label: text("ruffle-demo"),
     } as PanicAction,
 
     DownloadDesktop: {
         type: "open_link",
-        url: RUFFLE_ORIGIN + "/downloads#desktop-app",
+        url: LEGAXY_PAGE + "#jogar",
         label: text("ruffle-desktop"),
     } as PanicAction,
 
     UpdateRuffle: {
         type: "open_link",
-        url: RUFFLE_ORIGIN + "/downloads",
+        url: LEGAXY_PAGE + "#versao",
         label: text("update-ruffle"),
     } as PanicAction,
 
@@ -157,7 +158,8 @@ export const CommonActions = {
     openWiki(page: string, label?: string): PanicAction {
         return {
             type: "open_link",
-            url: `https://github.com/ruffle-rs/ruffle/wiki/${page}`,
+            // Ruffle Legaxy: ajuda na nossa pagina (o topico original vai no parametro).
+            url: `${LEGAXY_PAGE}?topico=${encodeURIComponent(page)}#ajuda`,
             label: label ?? text("ruffle-wiki"),
         };
     },

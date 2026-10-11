@@ -3,8 +3,8 @@ context-menu-copy-debug-info = Дебаг мәгълүматын күчерү
 context-menu-open-save-manager = Саклау менеджерын ачу
 context-menu-about-ruffle =
     { $flavor ->
-        [extension] Ruffle өстәмәсе турында ({ $version })
-       *[other] Ruffle турында ({ $version })
+        [extension] Ruffle Legaxy өстәмәсе турында ({ $version })
+       *[other] Ruffle Legaxy турында ({ $version })
     }
 context-menu-hide = Бу менюны яшер
 context-menu-exit-fullscreen = Тулы экраннан чыгу

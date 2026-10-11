@@ -11,7 +11,7 @@ export function HardwareAcceleration() {
                     data-i18n-key="enable-hardware-acceleration"
                 ></span>
                 <a
-                    href="https://github.com/ruffle-rs/ruffle/wiki/Frequently-Asked-Questions-For-Users#chrome-hardware-acceleration"
+                    href="https://naruto.legaxygames.com/play/ruffle-legaxy.html#aceleracao"
                     target="_blank"
                     class="modal-button"
                     data-i18n-key="enable-hardware-acceleration-link"

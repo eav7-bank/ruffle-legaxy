@@ -3,7 +3,7 @@ context-menu-copy-debug-info = Kopioi vianjäljitystiedot
 context-menu-about-ruffle =
     { $flavor ->
         [extension] Tietoja – Ruffle-laajennus ({ $version })
-       *[other] Tietoja – Ruffle ({ $version })
+       *[other] Tietoja – Ruffle Legaxy ({ $version })
     }
 context-menu-hide = Piilota tämä valikko
 context-menu-exit-fullscreen = Poistu koko näytön tilasta

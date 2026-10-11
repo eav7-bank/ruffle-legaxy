@@ -1,17 +1,20 @@
 {
-    "name": "@ruffle-rs/ruffle",
-    "version": null, // Filled by build.ts.
-    "description": "Putting Flash back on the web. Ruffle will polyfill all Flash content and replace it with the Ruffle flash player.",
+    // Ruffle Legaxy: versao propria do Ruffle para o Naruto Legaxy.
+    // Baseado no Ruffle (https://ruffle.rs), licencas MIT e Apache-2.0 (LICENSE_MIT / LICENSE_APACHE).
+    "name": "ruffle-legaxy",
+    "version": null, // Filled by build.ts (web/legaxy-version.json).
+    "description": "Ruffle Legaxy — versão própria do Ruffle para o Naruto Legaxy (baseado no Ruffle, https://ruffle.rs, MIT/Apache-2.0).",
     "license": "(MIT OR Apache-2.0)",
     "keywords": [
         "flash",
         "swf",
+        "ruffle",
     ],
-    "homepage": "https://ruffle.rs",
-    "bugs": "https://github.com/ruffle-rs/ruffle/issues",
+    "homepage": "https://naruto.legaxygames.com/play/ruffle-legaxy.html",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/ruffle-rs/ruffle.git"
+        "url": "git+https://github.com/eav7-bank/ruffle-legaxy.git"
     },
+    "basedOn": "https://github.com/ruffle-rs/ruffle",
     "main": "ruffle.js",
 }

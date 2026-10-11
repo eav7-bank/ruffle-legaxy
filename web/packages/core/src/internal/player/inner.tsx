@@ -17,7 +17,7 @@ import { localizeElements, text, textAsParagraphs } from "../i18n.js";
 import { swfFileName } from "../../swf-utils.js";
 import { isExtension } from "../../current-script.js";
 import { buildInfo } from "../../build-info.js";
-import { RUFFLE_ORIGIN } from "../constants.js";
+import { LEGAXY_PAGE } from "../constants.js";
 import {
     InvalidOptionsError,
     InvalidSwfError,
@@ -758,7 +758,7 @@ export class InnerPlayer {
 
         console.log(
             "%c" +
-                "New Ruffle instance created (Version: " +
+                "New Ruffle Legaxy instance created (Version: " +
                 buildInfo.versionName +
                 " | WebAssembly extensions: " +
                 (constructor.is_wasm_simd_used() ? "ON" : "OFF") +
@@ -1579,12 +1579,12 @@ export class InnerPlayer {
         addSeparator();
 
         items.push({
-            text: text("context-menu-about-ruffle", {
-                flavor: isExtension ? "extension" : "",
+            // Ruffle Legaxy: "Sobre o Ruffle Legaxy 0.0.1" -> a nossa pagina.
+            text: text("context-menu-about-legaxy", {
                 version: buildInfo.versionName,
             }),
             async onClick() {
-                window.open(RUFFLE_ORIGIN, "_blank");
+                window.open(LEGAXY_PAGE, "_blank");
             },
         });
         // Give option to disable context menu when touch support is being used
@@ -2011,12 +2011,14 @@ export class InnerPlayer {
         result += `Platform: ${window.navigator.platform}\n`;
         result += `Has touch support: ${window.navigator.maxTouchPoints > 0}\n`;
 
-        result += "\n# Ruffle Info\n";
+        result += "\n# Ruffle Legaxy Info\n";
         result += `Version: ${buildInfo.versionNumber}\n`;
         result += `Name: ${buildInfo.versionName}\n`;
         result += `Channel: ${buildInfo.versionChannel}\n`;
         result += `Built: ${buildInfo.buildDate}\n`;
         result += `Commit: ${buildInfo.commitHash}\n`;
+        result += `Page: ${LEGAXY_PAGE}\n`;
+        result += `Based on: Ruffle ${buildInfo.upstreamVersion} (https://ruffle.rs, MIT/Apache-2.0)\n`;
         result += `Is extension: ${isExtension}\n`;
 
         result += "\n# Metadata\n";
@@ -2412,7 +2414,7 @@ export function isYoutubeFlashSource(filename: string | null): boolean {
         let hostname = "";
         try {
             // A base URL is required if `filename` is a relative URL, but we don't need to detect the real URL origin.
-            const url = new URL(filename, RUFFLE_ORIGIN);
+            const url = new URL(filename, "https://ruffle.rs");
             pathname = url.pathname;
             hostname = url.hostname;
         } catch (_err) {

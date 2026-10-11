@@ -4,9 +4,22 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// Ruffle Legaxy: versao propria (web/legaxy-version.json). O que aparece para o usuario
+// (menu do clique direito, painel de informacoes, tela de pane) e "Ruffle Legaxy 0.0.1".
+// A versao do Ruffle base (package.json) continua em %UPSTREAM_VERSION%, usada so na escolha
+// entre fontes do Ruffle na pagina (extensao x selfhosted), para nao perder prioridade.
+const __legaxyDir = path.dirname(fileURLToPath(import.meta.url));
+const legaxy = JSON.parse(
+    fs.readFileSync(
+        path.resolve(__legaxyDir, "../../../legaxy-version.json"),
+        "utf8",
+    ),
+) as { name: string; version: string; channel: string };
+const upstreamVersion = process.env["npm_package_version"] ?? "";
+
 let buildDate = new Date().toISOString();
-let versionNumber = process.env["npm_package_version"] ?? "";
-let versionChannel = process.env["CFG_RELEASE_CHANNEL"] || "local";
+let versionNumber = legaxy.version;
+let versionChannel = process.env["CFG_RELEASE_CHANNEL"] || legaxy.channel;
 const firefoxExtensionId =
     process.env["FIREFOX_EXTENSION_ID"] || "ruffle@ruffle.rs";
 
@@ -18,12 +31,7 @@ try {
     console.log("Couldn't fetch latest git commit...");
 }
 
-let versionName;
-if (versionChannel === "stable" || versionNumber?.includes(versionChannel)) {
-    versionName = versionNumber;
-} else {
-    versionName = `${versionChannel} ${versionNumber}`;
-}
+let versionName = `${legaxy.name} ${versionNumber}`;
 
 interface VersionInformation {
     version_number: string;
@@ -83,6 +91,7 @@ const options = {
         /%BUILD_DATE%/g,
         /%COMMIT_HASH%/g,
         /%FALLBACK_WASM%/g,
+        /%UPSTREAM_VERSION%/g,
     ],
     to: [
         versionNumber,
@@ -91,6 +100,7 @@ const options = {
         buildDate,
         commitHash,
         fallbackWasmName,
+        upstreamVersion,
     ],
 };
 

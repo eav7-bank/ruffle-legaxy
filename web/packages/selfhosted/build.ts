@@ -33,7 +33,15 @@ if (pkgVersion === undefined) {
     throw new Error("npm_package_version environment variable is not defined");
 }
 
-pkg.version = pkgVersion;
+// Ruffle Legaxy: o pacote leva a NOSSA versao (web/legaxy-version.json); a do Ruffle base vai em basedOnVersion.
+const legaxy = JSON.parse(
+    fs.readFileSync(
+        path.resolve(__dirname, "../../legaxy-version.json"),
+        "utf8",
+    ),
+) as { version: string };
+pkg.version = legaxy.version;
+pkg["basedOnVersion"] = pkgVersion;
 fs.writeFileSync(
     path.join(distDir, "package.json"),
     JSON.stringify(pkg, null, 2),

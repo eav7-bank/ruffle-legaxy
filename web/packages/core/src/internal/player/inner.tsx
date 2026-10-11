@@ -1579,9 +1579,9 @@ export class InnerPlayer {
         addSeparator();
 
         items.push({
-            // Ruffle Legaxy: "Sobre o Ruffle Legaxy 0.0.1" -> a nossa pagina.
+            // Ruffle Legaxy: "Sobre o Ruffle Legaxy (Public 0.0.1)" -> a nossa pagina (pedido do dono).
             text: text("context-menu-about-legaxy", {
-                version: buildInfo.versionName,
+                version: `Ruffle Legaxy (Public ${buildInfo.versionNumber})`,
             }),
             async onClick() {
                 window.open(LEGAXY_PAGE, "_blank");

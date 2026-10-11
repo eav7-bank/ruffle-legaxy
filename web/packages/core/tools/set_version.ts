@@ -5,7 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 // Ruffle Legaxy: versao propria (web/legaxy-version.json). O que aparece para o usuario
-// (menu do clique direito, painel de informacoes, tela de pane) e "Ruffle Legaxy 0.0.1".
+// (menu do clique direito, painel de informacoes, tela de pane) e "Ruffle Legaxy 1.0.1".
 // A versao do Ruffle base (package.json) continua em %UPSTREAM_VERSION%, usada so na escolha
 // entre fontes do Ruffle na pagina (extensao x selfhosted), para nao perder prioridade.
 const __legaxyDir = path.dirname(fileURLToPath(import.meta.url));

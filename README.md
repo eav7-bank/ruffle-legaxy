@@ -1,13 +1,18 @@
 # Ruffle Legaxy
 
-**Versão própria do Ruffle para o Naruto Legaxy — versão 0.0.1.**
+**Versão própria do Ruffle para o Naruto Legaxy — versão 1.0.1.**
 
 Página: https://naruto.legaxygames.com/play/ruffle-legaxy.html
 
 O Ruffle Legaxy é o "Flash" que roda o Naruto Legaxy no navegador, sem instalar nada. É um fork do
 [Ruffle](https://ruffle.rs) (emulador de Flash Player em Rust + WebAssembly) com correções feitas para o jogo.
 
-## O que a versão 0.0.1 melhora
+## O que a versão 1.0.1 melhora
+- **Textos que se movem não são redesenhados**: mover um campo de texto (nomes dos personagens, que o jogo
+  reposiciona a cada quadro) não invalida mais o cache de bitmap dele — os nomes com brilho deixavam de ser
+  redesenhados com filtro todo quadro. No celular o desenho caiu de 26 ms para 6,4 ms por quadro (30 fps).
+
+## O que a versão 0.0.1 trouxe
 - **Sem pane de memória nas lutas**: no Ruffle oficial a memória WebAssembly subia a cada quadro de efeito
   das lutas pesadas até o limite de 4 GiB (pane "unreachable"). Aqui isso não acumula mais.
 - **Imagens compartilhadas**: cada BitmapData de símbolo da biblioteca é decodificado uma vez; as instâncias
@@ -15,12 +20,12 @@ O Ruffle Legaxy é o "Flash" que roda o Naruto Legaxy no navegador, sem instalar
 - **GC por bytes**: a dívida do coletor de lixo é proporcional aos bytes de pixels, não só ao nº de objetos.
 - **Memória real**: `System.totalMemory`/`privateMemory` reais e coleta contínua do GC.
 - **Medição**: heap vivo, BitmapData, texturas e quadros executados expostos ao JS (telemetria do jogo).
-- **Identidade própria**: "Ruffle Legaxy 0.0.1" no clique direito ("Sobre o Ruffle Legaxy 0.0.1"), na tela de
+- **Identidade própria**: "Ruffle Legaxy" com a versão no clique direito ("Sobre o Ruffle Legaxy (Public 1.0.1)"), na tela de
   erro e nas informações de depuração; todos os links levam para a nossa página.
 
 ## Versão
 - A versão fica em [`web/legaxy-version.json`](web/legaxy-version.json) (`name`, `version`, `channel`).
-  O `web/packages/core/tools/set_version.ts` gera `versionName = "Ruffle Legaxy 0.0.1"`, canal `legaxy`.
+  O `web/packages/core/tools/set_version.ts` gera `versionName = "Ruffle Legaxy 1.0.1"`, canal `legaxy`.
 - A versão do Ruffle oficial em que nos baseamos fica em `buildInfo.upstreamVersion` (hoje 0.7.1, master
   `fdf3d4db`); ela é usada só para a escolha entre fontes do Ruffle na página (extensão × selfhosted).
 - Para lançar uma versão nova: mude `web/legaxy-version.json`, faça commit e crie a tag `vX.Y.Z`.

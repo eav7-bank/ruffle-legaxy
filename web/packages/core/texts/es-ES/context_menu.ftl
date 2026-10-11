@@ -10,5 +10,5 @@ context-menu-hide = Ocultar este menú
 context-menu-exit-fullscreen = Salir de pantalla completa
 context-menu-enter-fullscreen = Entrar a pantalla completa
 context-menu-volume-controls = Controles de volumen
-# Ruffle Legaxy: item "Sobre" do clique direito ($version = "Ruffle Legaxy 0.0.1").
+# Ruffle Legaxy: item "Sobre" do clique direito ($version = "Ruffle Legaxy 1.0.1").
 context-menu-about-legaxy = Acerca de { $version }

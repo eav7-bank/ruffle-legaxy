@@ -1579,7 +1579,7 @@ export class InnerPlayer {
         addSeparator();
 
         items.push({
-            // Ruffle Legaxy: "Sobre o Ruffle Legaxy (Public 0.0.1)" -> a nossa pagina (pedido do dono).
+            // Ruffle Legaxy: "Sobre o Ruffle Legaxy (Public 1.0.1)" -> a nossa pagina (pedido do dono).
             text: text("context-menu-about-legaxy", {
                 version: `Ruffle Legaxy (Public ${buildInfo.versionNumber})`,
             }),

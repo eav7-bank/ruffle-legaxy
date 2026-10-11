@@ -14,7 +14,7 @@ export const internalSourceApi = {
      * The version of this particular API, as a string in a semver compatible format.
      */
     version:
-        // Ruffle Legaxy: compara pela versao do Ruffle base (a nossa 0.0.1 perderia para qualquer extensao).
+        // Ruffle Legaxy: compara pela versao do Ruffle base (a nossa 1.0.1 perderia para qualquer extensao).
         buildInfo.upstreamVersion + "+" + buildInfo.buildDate.substring(0, 10),
 
     /**

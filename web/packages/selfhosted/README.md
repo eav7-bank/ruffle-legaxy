@@ -1,4 +1,4 @@
-# Ruffle Legaxy 0.0.1
+# Ruffle Legaxy 1.0.1
 
 Versão própria do Ruffle para o **Naruto Legaxy** — https://naruto.legaxygames.com/play/ruffle-legaxy.html
 (código: https://github.com/eav7-bank/ruffle-legaxy).

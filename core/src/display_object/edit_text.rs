@@ -2628,8 +2628,14 @@ impl<'gc> TDisplayObject<'gc> for EditText<'gc> {
     fn set_x(self, x: Twips) {
         self.apply_autosize_bounds();
         let offset = self.bounds_x_offset();
-        self.base().set_x(x - offset);
-        self.invalidate_cached_bitmap();
+        // Ruffle Legaxy: mover o campo de texto NÃO muda a imagem dele — só o cache do pai (e só se mudou de verdade),
+        // igual ao set_x geral. Antes invalidava o próprio cache sempre: o jogo reposiciona os nomes de todos os
+        // personagens a cada quadro e os ~53 nomes com brilho eram redesenhados com filtro todo quadro (celular: 14 ms).
+        if self.base().set_x(x - offset) {
+            if let Some(parent) = self.parent() {
+                parent.invalidate_cached_bitmap();
+            }
+        }
     }
 
     fn y(self) -> Twips {
@@ -2640,8 +2646,14 @@ impl<'gc> TDisplayObject<'gc> for EditText<'gc> {
     fn set_y(self, y: Twips) {
         self.apply_autosize_bounds();
         let offset = self.bounds_y_offset();
-        self.base().set_y(y - offset);
-        self.invalidate_cached_bitmap();
+        // Ruffle Legaxy: mover o campo de texto NÃO muda a imagem dele — só o cache do pai (e só se mudou de verdade),
+        // igual ao set_y geral. Antes invalidava o próprio cache sempre: o jogo reposiciona os nomes de todos os
+        // personagens a cada quadro e os ~53 nomes com brilho eram redesenhados com filtro todo quadro (celular: 14 ms).
+        if self.base().set_y(y - offset) {
+            if let Some(parent) = self.parent() {
+                parent.invalidate_cached_bitmap();
+            }
+        }
     }
 
     fn width(self) -> f64 {

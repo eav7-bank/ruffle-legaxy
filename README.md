@@ -1,188 +1,54 @@
-<p align="center">
-  <a href="https://ruffle.rs"><img alt="Ruffle" src="https://ruffle.rs/logo.svg" /></a>
-</p>
-<p align="center">
-  <a href="https://github.com/ruffle-rs/ruffle/actions"><img alt="Rust Build Status" src="https://img.shields.io/github/actions/workflow/status/ruffle-rs/ruffle/test_rust.yml?label=Rust%20Build&logo=github&branch=master" /></a>
-  <a href="https://github.com/ruffle-rs/ruffle/actions/workflows/test_web.yml"><img alt="Web Build Status" src="https://img.shields.io/github/actions/workflow/status/ruffle-rs/ruffle/test_web.yml?label=Web%20Build&logo=github&branch=master" /></a>
-  <a href="https://discord.gg/ruffle"><img alt="Ruffle Discord" src="https://img.shields.io/discord/610531541889581066?label=&color=7389d8&labelColor=6a7ec2&logoColor=ffffff&logo=discord" /></a>
-  <a href="https://crowdin.com/project/ruffle"><img alt="Ruffle translations" src="https://badges.crowdin.net/ruffle/localized.svg" /></a>
-  <br />
-  <a href="https://addons.mozilla.org/en-US/firefox/addon/ruffle_rs/"><img alt="Firefox Extension" src="https://img.shields.io/amo/v/ruffle_rs?logo=firefoxbrowser&logoColor=white&label=firefox" /></a>
-  <a href="https://chromewebstore.google.com/detail/ruffle-flash-emulator/donbcfbmhbcapadipfkeojnmajbakjdc"><img alt="Chrome Extension" src="https://img.shields.io/chrome-web-store/v/donbcfbmhbcapadipfkeojnmajbakjdc?logo=googlechrome&logoColor=white&label=chrome" /></a>
-  <a href="https://flathub.org/apps/rs.ruffle.Ruffle"><img alt="Ruffle Flathub" src="https://img.shields.io/flathub/v/rs.ruffle.Ruffle?color=007acc&logo=flathub" /></a>
-  <a href="https://www.npmjs.com/package/@ruffle-rs/ruffle"><img alt="Ruffle npm" src="https://img.shields.io/npm/v/@ruffle-rs/ruffle?color=007acc&logo=npm" /></a>
-  <a href="https://aur.archlinux.org/packages/ruffle-nightly-bin"><img alt="Ruffle AUR" src="https://img.shields.io/aur/version/ruffle-nightly-bin?logo=archlinux" /></a>
-  <br />
-  <strong><a href="https://ruffle.rs">website</a> | <a href="https://ruffle.rs/demo">demo</a> | <a href="https://github.com/ruffle-rs/ruffle/releases">nightly builds</a> | <a href="https://github.com/ruffle-rs/ruffle/wiki">wiki</a></strong>
-</p>
+# Ruffle Legaxy
 
-# Ruffle
+**Versão própria do Ruffle para o Naruto Legaxy — versão 0.0.1.**
 
-Ruffle is an Adobe Flash Player emulator written in the Rust programming language. Ruffle targets both the desktop and the web using WebAssembly.
+Página: https://naruto.legaxygames.com/play/ruffle-legaxy.html
 
-## Table of Contents
-* [Project status](#project-status)
-* [Using Ruffle](#using-ruffle)
-* [Building from source](#building-from-source)
-  * [Prerequisites](#prerequisites)
-  * [Linux prerequisites](#linux-prerequisites)
-  * [Desktop](#desktop)
-    * [Build](#build)
-    * [macOS](#macos)
-  * [Web or Extension](#web-or-extension)
-  * [Android](#android)
-  * [Scanner](#scanner)
-  * [Exporter](#exporter)
-* [Structure](#structure)
-* [Sponsors](#sponsors)
-* [License](#license)
-* [Contributing](#contributing)
+O Ruffle Legaxy é o "Flash" que roda o Naruto Legaxy no navegador, sem instalar nada. É um fork do
+[Ruffle](https://ruffle.rs) (emulador de Flash Player em Rust + WebAssembly) com correções feitas para o jogo.
 
+## O que a versão 0.0.1 melhora
+- **Sem pane de memória nas lutas**: no Ruffle oficial a memória WebAssembly subia a cada quadro de efeito
+  das lutas pesadas até o limite de 4 GiB (pane "unreachable"). Aqui isso não acumula mais.
+- **Imagens compartilhadas**: cada BitmapData de símbolo da biblioteca é decodificado uma vez; as instâncias
+  dividem os mesmos pixels e a mesma textura na GPU (copy-on-write: só copia se o AS3 escrever).
+- **GC por bytes**: a dívida do coletor de lixo é proporcional aos bytes de pixels, não só ao nº de objetos.
+- **Memória real**: `System.totalMemory`/`privateMemory` reais e coleta contínua do GC.
+- **Medição**: heap vivo, BitmapData, texturas e quadros executados expostos ao JS (telemetria do jogo).
+- **Identidade própria**: "Ruffle Legaxy 0.0.1" no clique direito ("Sobre o Ruffle Legaxy 0.0.1"), na tela de
+  erro e nas informações de depuração; todos os links levam para a nossa página.
 
-## Project status
+## Versão
+- A versão fica em [`web/legaxy-version.json`](web/legaxy-version.json) (`name`, `version`, `channel`).
+  O `web/packages/core/tools/set_version.ts` gera `versionName = "Ruffle Legaxy 0.0.1"`, canal `legaxy`.
+- A versão do Ruffle oficial em que nos baseamos fica em `buildInfo.upstreamVersion` (hoje 0.7.1, master
+  `fdf3d4db`); ela é usada só para a escolha entre fontes do Ruffle na página (extensão × selfhosted).
+- Para lançar uma versão nova: mude `web/legaxy-version.json`, faça commit e crie a tag `vX.Y.Z`.
 
-Ruffle supports ActionScript 1, 2 and 3 pretty well, but it's still not finished by any means. Please report any issues in the [Issue Tracker](https://github.com/ruffle-rs/ruffle/issues).
+## Como compilar (máquina do Jonathan, Windows)
+Ferramentas: Rust 1.99 + alvo `wasm32-unknown-unknown` + `rust-src`, Node 24, `wasm-bindgen-cli` 0.2.127,
+Binaryen 133 (`wasm-opt`, em `%LOCALAPPDATA%\binaryen\binaryen-version_133\bin`), Java 21 (Temurin),
+LLVM/clang (`C:\Program Files\LLVM\bin`, para a dependência C do jpegxr) e VS 2022 Build Tools (C++).
 
-## Using Ruffle
+```powershell
+$env:Path = "C:\Program Files\nodejs;$env:USERPROFILE\.cargo\bin;$env:LOCALAPPDATA\binaryen\binaryen-version_133\bin;C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot\bin;C:\Program Files\LLVM\bin;" + $env:Path
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+cd web
+npm ci
+npm run build:dual-wasm
+```
 
-The easiest way to try out Ruffle is to visit the [web demo page](https://ruffle.rs/demo/), then click the "Select File" button to load a SWF file of your choice.
+Saída: `web/packages/selfhosted/dist/` — `ruffle.js` + 2 `.wasm` (com extensões/SIMD e o básico "mvp")
++ `LICENSE_MIT`, `LICENSE_APACHE`, `README.md`, `package.json`. No jogo, a pasta vai para
+`client/www/ruffle_legaxy/` (sem o `ruffle.js.map`) e a `client/www/index.html` aponta o mapa `WASM` para o
+nome do `.wasm` com extensões.
 
-[Nightly builds](https://ruffle.rs/downloads#nightly-releases) of Ruffle are available for desktop and web platforms.
+## Atribuição e licenças
+O Ruffle Legaxy é **baseado no Ruffle (https://ruffle.rs), licenças MIT e Apache-2.0**.
+Copyright (c) 2018 Ruffle LLC <ruffle@ruffle.rs> and Ruffle contributors. Os avisos de copyright do projeto
+original foram mantidos; as alterações do Naruto Legaxy seguem as mesmas licenças (MIT OR Apache-2.0).
 
-For more detailed instructions, see our [wiki page](https://github.com/ruffle-rs/ruffle/wiki/Using-Ruffle).
-
-## Building from source
-
-### Prerequisites
-
-* Latest stable channel of [Rust](https://www.rust-lang.org/tools/install)
-* Java, available on your PATH as `java` (required for building the library containing the builtin Flash classes for ActionScript 3)
-
-### Linux prerequisites
-
-The following are typical dependencies for Linux:
-
-* Ubuntu/Debian:
-  ```shell
-  sudo apt install pkg-config libasound2-dev libudev-dev libfontconfig-dev libfreetype6-dev libssl-dev default-jre-headless g++
-  ```
-
-* Fedora/RHEL:
-  ```shell
-  sudo dnf install pkgconf-pkg-config alsa-lib-devel systemd-devel fontconfig-devel freetype-devel openssl-devel java-latest-openjdk-headless gcc-c++
-  ```
-
-### Desktop
-
-#### Build
-
-Use the following command to build and run the desktop app:
-
-`cargo run --release --package=ruffle_desktop`
-
-To run a specific SWF file, pass the SWF path as an argument:
-
-`cargo run --release --package=ruffle_desktop -- test.swf`
-
-To build in debug mode, simply omit `--release` from the command.
-
-Desktop has a few optional features which you can specify via `--features`, comma separated:
-
-* `tracy`: Enables profiling to [Tracy](https://github.com/wolfpld/tracy). You may need to expand the log filter to see everything, e.g. `RUST_LOG="warn,ruffle=debug"`
-* `tracy_images`: Enables Tracy frame captures. Implies `tracy`.
-* `tracy_avm`: Enables profiling AVM execution with Tracy. Implies `tracy`.
-* `render_debug_labels`: Enables debug labels during rendering, useful for debugging graphics with [renderdoc](https://renderdoc.org/) or similar.
-
-#### macOS
-
-Ruffle desktop can be built from our [Homebrew Tap](https://github.com/ruffle-rs/homebrew-ruffle/):
-
-`brew install --HEAD ruffle-rs/ruffle/ruffle`
-
-_Note: because it is HEAD-only, you'll need to run `brew upgrade --fetch-HEAD ruffle` each time you want to update._
-
-### Web or Extension
-
-Follow [the instructions in the web directory](web/README.md#building-from-source) for building
-either the web or browser extension version of Ruffle.
-
-This project is tested with BrowserStack.
-
-### Android
-
-Follow the [instructions](https://github.com/ruffle-rs/ruffle-android/blob/main/CONTRIBUTING.md#building-from-source) in the `ruffle-android` project for building the Android application of Ruffle.
-
-### Scanner
-
-If you have a collection of "real world" SWFs to test against, the scanner may be used to benchmark
-ruffle's parsing capabilities. Provided with a folder and an output filename, it will attempt to read
-all of the Flash files and report on the success of such a task.
-
-`cargo run --release --package=ruffle_scanner -- scan folder/with/swfs/ results.csv`
-
-### Exporter
-
-If you have a SWF file and would like to capture an image of it, you may use the exporter tool.
-This currently requires hardware acceleration, but can be run headless (with no window).
-
-- `cargo run --release --package=exporter -- path/to/file.swf`
-- `cargo run --release --package=exporter -- path/to/file.swf path/to/screenshots --frames 5`
-
-## Structure
-
-- `core` - core emulator and common code
-- `swf` - SWF and ActionScript parser
-- `desktop` - desktop client (uses `wgpu-rs`)
-- `web` - web client and browser extension (uses `wasm-bindgen`)
-- `render` - various rendering backends for both desktop and web
-- `video` - video decoding backends
-- `flv` - Flash Video decoder
-- `wstr` - a Flash-compatible implementation of strings
-- `scanner` - a utility to bulk parse SWF files
-- `exporter` - a utility to generate PNG screenshots of a SWF file
-
-## Sponsors
-
-You can support the development of Ruffle via [GitHub Sponsors](https://github.com/sponsors/ruffle-rs). Your sponsorship will help to ensure the accessibility of Flash content for the future. Thank you!
-
-Sincere thanks to the diamond level sponsors of Ruffle:
-
-<p align="center">
-  <a href="https://www.newgrounds.com"><img src="https://ruffle.rs/sponsors/newgrounds.png" alt="Newgrounds.com"></a>
-  <a href="https://www.cpmstar.com"><img src="https://ruffle.rs/sponsors/cpmstar.png" alt="CPMStar"></a>
-  <a href="https://deepnight.net"><img src="https://ruffle.rs/sponsors/deepnight.png" alt="Sébastien Bénard"></a>
-  <a href="https://www.crazygames.com"><img src="https://ruffle.rs/sponsors/crazygames.png" alt="Crazy Games"></a>
-  <a href="https://www.coolmathgames.com"><img src="https://ruffle.rs/sponsors/coolmathgames.png" alt="Cool Math Games"></a>
-  <a href="https://www.nytimes.com/"><img src="https://ruffle.rs/sponsors/nyt.png" alt="The New York Times"></a>
-  <a href="https://www.armorgames.com/"><img src="https://ruffle.rs/sponsors/armorgames.png" alt="Armor Games"></a>
-  <a href="https://www.ondaeduca.com/"><img src="https://ruffle.rs/sponsors/ondaeduca.png" alt="Onda Educa"></a>
-  <a href="https://www.twoplayergames.org/"><img src="https://ruffle.rs/sponsors/twoplayergames.png" alt="TwoPlayerGames.org"></a>
-  <a href="https://www.wowgame.jp/"><img src="https://ruffle.rs/sponsors/wowgame.png" alt="wowgame.jp"></a>
-  <a href="http://kupogames.com/"><img src="https://ruffle.rs/sponsors/mattroszak.png" alt="Matt Roszak"></a>
-  <a href="https://www.dolldivine.com/"><img src="https://ruffle.rs/sponsors/dolldivine.png" alt="Doll Divine"></a>
-  <a href="https://movavi.com/"><img src="https://ruffle.rs/sponsors/movavi.svg" alt="Movavi"></a>
-  <a href="https://www.kongregate.com/"><img src="https://ruffle.rs/sponsors/kongregate.svg" alt="Kongregate"></a>
-  <a href="https://www.bubbleshooter.net/"><img src="https://ruffle.rs/sponsors/bubble-shooter.png" alt="Bubble Shooter"></a>
-  <a href="https://www.neopets.com/"><img src="https://ruffle.rs/sponsors/neopets.png" alt="Neopets"></a>
-</p>
-
-## License
-
-Ruffle is licensed under either of
-
-- Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
-- MIT License (http://opensource.org/licenses/MIT)
-
-at your option.
-
-Ruffle depends on third-party libraries under compatible licenses. See [LICENSE.md](LICENSE.md) for full information.
-
-### Contributing
-
-Ruffle welcomes contribution from everyone. See [CONTRIBUTING.md](CONTRIBUTING.md) for help getting started.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you shall be dual licensed as above, without any
-additional terms or conditions.
-
-The entire Ruffle community, including the chat room and GitHub project, is expected to abide by the [Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct) that the Rust project itself follows.
+- Licenças do projeto: [`LICENSE.md`](LICENSE.md); no pacote web: `web/packages/selfhosted/LICENSE_MIT` e
+  `web/packages/selfhosted/LICENSE_APACHE` (copiados para o `dist`).
+- README original do Ruffle: [`README_RUFFLE.md`](README_RUFFLE.md).
+- Projeto original: https://github.com/ruffle-rs/ruffle

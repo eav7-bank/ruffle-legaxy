@@ -1485,6 +1485,7 @@ pub fn n7_memoria(i: u32) -> f64 {
         9 => m::TEXTURAS_REGISTRADAS.load(Relaxed) as f64,
         10 => m::LEITURAS_TOTAL_MEMORY.load(Relaxed) as f64,
         11 => m::fator_coleta_por_quadro(),
+        12 => m::QUADROS_EXECUTADOS.load(Relaxed) as f64,
         _ => -1.0,
     }
 }

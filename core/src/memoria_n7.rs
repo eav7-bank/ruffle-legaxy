@@ -93,3 +93,6 @@ pub static LEITURAS_TOTAL_MEMORY: AtomicU64 = AtomicU64::new(0);
 pub fn fator_coleta_por_quadro() -> f64 {
     f64::from_bits(FATOR_COLETA_POR_QUADRO.load(Ordering::Relaxed))
 }
+
+/// Quadros do SWF executados (`Player::run_frame`): fps real do conteudo.
+pub static QUADROS_EXECUTADOS: AtomicU64 = AtomicU64::new(0);

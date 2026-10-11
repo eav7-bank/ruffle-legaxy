@@ -2055,6 +2055,7 @@ impl Player {
 
     #[instrument(level = "debug", skip_all)]
     pub fn run_frame(&mut self) {
+        crate::memoria_n7::contar(&crate::memoria_n7::QUADROS_EXECUTADOS);
         // Coleta continua (Naruto Legaxy): o gc-arena so comeca um ciclo novo depois de muitas
         // alocacoes de objetos; com o jogo parado (cidade), os bitmaps que o jogo larga ao sair da
         // luta ficavam vivos por minutos. Uma pequena divida por quadro garante um ciclo completo

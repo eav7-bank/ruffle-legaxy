@@ -1304,14 +1304,9 @@ impl<'gc> Value<'gc> {
         arguments: FunctionArgs<'_, 'gc>,
         activation: &mut Activation<'_, 'gc>,
     ) -> Result<Value<'gc>, Error<'gc>> {
-        // TODO: Bound methods should be cached on the Method in a
-        // WeakKeyHashMap<Value, FunctionObject>, not on the Object
-        if let Some(object) = self.as_object()
-            && let Some(bound_method) = object.get_bound_method(id)
-        {
-            return bound_method.call(activation, *self, arguments);
-        }
-
+        // Ruffle Legaxy: o metodo que nao usa `arguments` (quase todos) executa direto pela vtable, sem
+        // consultar antes a tabela de metodos vinculados do objeto (um Vec fora do objeto = mais uma falta de
+        // cache por chamada; ~8% da CPU no Naruto Legaxy). O vinculado so importa para `arguments.callee`.
         let vtable = self.vtable(activation);
 
         let full_method = vtable.get_full_method(id).expect("Method should exist");
@@ -1327,6 +1322,14 @@ impl<'gc> Value<'gc> {
                 activation,
                 None,
             );
+        }
+
+        // TODO: Bound methods should be cached on the Method in a
+        // WeakKeyHashMap<Value, FunctionObject>, not on the Object
+        if let Some(object) = self.as_object()
+            && let Some(bound_method) = object.get_bound_method(id)
+        {
+            return bound_method.call(activation, *self, arguments);
         }
 
         let bound_method = VTable::bind_method(activation.context, *self, full_method);

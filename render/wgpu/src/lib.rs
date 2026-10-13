@@ -275,6 +275,9 @@ impl QueueSyncHandle {
 
 #[derive(Debug)]
 pub struct Texture {
+    /// Ruffle Legaxy: bytes desta textura no total de `ruffle_render::memoria`.
+    #[allow(dead_code)]
+    conta: ruffle_render::memoria::ContaTextura,
     pub(crate) texture: wgpu::Texture,
     repeating_linear: OnceCell<BitmapBinds>,
     repeating_nearest: OnceCell<BitmapBinds>,

@@ -928,6 +928,8 @@ impl<'a, 'gc> Activation<'a, 'gc> {
         *self.context.actions_since_timeout_check += 1;
         if *self.context.actions_since_timeout_check >= 10000 {
             *self.context.actions_since_timeout_check = 0;
+            // Ruffle Legaxy: deixa o app atender o sistema durante scripts longos (servico_n7)
+            crate::servico_n7::talvez_servir();
             if self.context.update_start.elapsed() >= self.context.max_execution_duration {
                 return Err(
                     "A script in this movie has taken too long to execute and has been terminated."

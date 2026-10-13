@@ -139,3 +139,57 @@ unsafe impl std::alloc::GlobalAlloc for AlocadorContador {
         q
     }
 }
+
+/// Multiplicador aplicado ao que o jogo le em `System.totalMemory` (bits de f64; padrao 1,0). No
+/// celular o app pode subir (ex.: 2,0) para o jogo liberar recursos com metade da memoria real.
+pub static FATOR_TOTAL_MEMORY: AtomicU64 = AtomicU64::new(0x3FF0000000000000);
+
+#[inline]
+pub fn fator_total_memory() -> f64 {
+    f64::from_bits(FATOR_TOTAL_MEMORY.load(Ordering::Relaxed))
+}
+
+pub fn definir_fator_total_memory(f: f64) {
+    if f.is_finite() && f > 0.0 {
+        FATOR_TOTAL_MEMORY.store(f.to_bits(), Ordering::Relaxed);
+    }
+}
+
+/// Quadros restantes de "pressao de memoria": enquanto > 0, `System.totalMemory` informa no minimo
+/// [`MEMORIA_SOB_PRESSAO`] para o jogo soltar tudo o que ele libera por memoria na proxima troca de
+/// tela/luta (aviso de pouca memoria do sistema).
+pub static QUADROS_SOB_PRESSAO: AtomicU64 = AtomicU64::new(0);
+/// 1 GiB: acima do limite do Naruto Legaxy (700 * 1024 * 1000 bytes).
+pub const MEMORIA_SOB_PRESSAO: f64 = 1024.0 * 1024.0 * 1024.0;
+
+/// O sistema avisou pouca memoria: o jogo passa a ver memoria alta por `quadros` quadros.
+pub fn sinalizar_pressao(quadros: u64) {
+    QUADROS_SOB_PRESSAO.fetch_max(quadros, Ordering::Relaxed);
+}
+
+/// Chamado a cada quadro executado.
+#[inline]
+pub fn passar_quadro_pressao() {
+    let _ = QUADROS_SOB_PRESSAO.try_update(Ordering::Relaxed, Ordering::Relaxed, |q| q.checked_sub(1));
+}
+
+/// Avisos de pouca memoria recebidos (`Player::liberar_memoria`).
+pub static LIBERACOES: AtomicU64 = AtomicU64::new(0);
+
+/// Bytes que o jogo "usa" segundo `System.totalMemory`: heap vivo + texturas da GPU, vezes o fator;
+/// `None` sem alocador contador (o chamador usa o valor fixo antigo).
+pub fn memoria_do_jogo() -> Option<f64> {
+    let vivo = heap_vivo();
+    if vivo == 0 {
+        return None;
+    }
+    let gpu = ruffle_render::memoria::bytes_texturas() as f64;
+    let mut v = (vivo as f64 + gpu) * fator_total_memory();
+    if QUADROS_SOB_PRESSAO.load(Ordering::Relaxed) > 0 {
+        v = v.max(MEMORIA_SOB_PRESSAO);
+    }
+    Some(v)
+}
+
+/// Objetos vivos no coletor (gc-arena), atualizado a cada quadro executado.
+pub static OBJETOS_GC: AtomicU64 = AtomicU64::new(0);

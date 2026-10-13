@@ -2056,6 +2056,7 @@ impl Player {
     #[instrument(level = "debug", skip_all)]
     pub fn run_frame(&mut self) {
         crate::memoria_n7::contar(&crate::memoria_n7::QUADROS_EXECUTADOS);
+        crate::memoria_n7::passar_quadro_pressao();
         // Coleta continua (Naruto Legaxy): o gc-arena so comeca um ciclo novo depois de muitas
         // alocacoes de objetos; com o jogo parado (cidade), os bitmaps que o jogo larga ao sair da
         // luta ficavam vivos por minutos. Uma pequena divida por quadro garante um ciclo completo
@@ -2063,6 +2064,7 @@ impl Player {
         {
             let arena = self.gc_arena.borrow();
             let m = arena.metrics();
+            crate::memoria_n7::OBJETOS_GC.store(m.total_gc_count() as u64, std::sync::atomic::Ordering::Relaxed);
             let fator = crate::memoria_n7::fator_coleta_por_quadro();
             if fator > 0.0 {
                 m.adjust_debt(m.total_gc_count() as f64 * fator);
@@ -2462,6 +2464,21 @@ impl Player {
         self.gc_arena.borrow_mut().collect_debt();
 
         rval
+    }
+
+    /// Ruffle Legaxy: o sistema avisou pouca memoria (Android `onLowMemory`/`onTrimMemory`).
+    /// Fecha o ciclo do coletor (o lixo ja solto e liberado agora, sem esperar a divida), larga os
+    /// caches do renderizador e faz o jogo ver memoria alta por ~90 s em `System.totalMemory`,
+    /// para ele soltar os recursos de luta/janela na proxima troca de tela.
+    pub fn liberar_memoria(&mut self) {
+        crate::memoria_n7::contar(&crate::memoria_n7::LIBERACOES);
+        crate::memoria_n7::sinalizar_pressao(90 * 30);
+        if let Ok(mut arena) = self.gc_arena.try_borrow_mut() {
+            // o 1o termina o ciclo em andamento; o 2o percorre tudo de novo e solta o que sobrou
+            arena.finish_cycle();
+            arena.finish_cycle();
+        }
+        self.renderer.liberar_caches();
     }
 
     pub fn flush_shared_objects(&mut self) {

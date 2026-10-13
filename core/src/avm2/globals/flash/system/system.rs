@@ -51,15 +51,12 @@ pub fn exit<'gc>(
     Err("Unsupported System.exit() was called".into())
 }
 
-/// Bytes em uso no heap do Ruffle (alocador contador do ruffle_web); sem ele, 90 MB como antes.
+/// Bytes em uso segundo o jogo (`memoria_n7::memoria_do_jogo`); sem alocador contador, 90 MB como antes.
 fn memoria_em_uso() -> f64 {
     crate::memoria_n7::contar(&crate::memoria_n7::LEITURAS_TOTAL_MEMORY);
-    let vivo = crate::memoria_n7::heap_vivo();
-    if vivo > 0 {
-        vivo as f64
-    } else {
-        (1024 * 1024 * 90) as f64
-    }
+    // heap vivo + texturas da GPU (x fator; minimo de 1 GiB sob pressao de memoria): o Naruto Legaxy
+    // so solta texturas de luta/janela acima de 700 MB (TResourceRepositoryTexture)
+    crate::memoria_n7::memoria_do_jogo().unwrap_or((1024 * 1024 * 90) as f64)
 }
 
 /// Memoria reservada pelo processo (no wasm: tamanho da memoria linear).

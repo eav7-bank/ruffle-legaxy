@@ -673,7 +673,9 @@ impl<T: RenderTarget + 'static> RenderBackend for WgpuRenderBackend<T> {
 
         self.active_frame
             .submit_for_target(&self.descriptors, &self.target, frame_output);
-        self.offscreen_texture_pool = TexturePool::new();
+        // Ruffle Legaxy: o pool dos filtros vive entre quadros (antes era recriado aqui a cada quadro)
+        self.offscreen_texture_pool.fim_do_quadro();
+        self.texture_pool.fim_do_quadro();
         self.profiler
             .end_frame()
             .expect("Frame should end successfully");

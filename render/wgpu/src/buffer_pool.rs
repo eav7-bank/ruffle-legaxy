@@ -12,11 +12,37 @@ type Constructor<Type, Description> = Box<dyn Fn(&Descriptors, &Description) -> 
 pub struct TexturePool {
     pools: FnvHashMap<TextureKey, BufferPool<(wgpu::Texture, wgpu::TextureView), AlwaysCompatible>>,
     globals_cache: FnvHashMap<GlobalsKey, Arc<Globals>>,
+    /// Ruffle Legaxy: quadro atual e último quadro em que cada tamanho foi pedido. O pool dos filtros era
+    /// recriado a cada quadro (`TexturePool::new()`), então todo brilho/desfoque criava texturas novas na GPU a
+    /// cada quadro (medido no Android: ~10% da CPU em create_texture + alocador). Agora o pool vive entre quadros
+    /// e só descarta o que ficou `QUADROS_SEM_USO` quadros sem ser pedido.
+    quadro: u64,
+    ultimo_uso: FnvHashMap<TextureKey, u64>,
+    ultimo_uso_globals: FnvHashMap<GlobalsKey, u64>,
 }
+
+/// ~2 s a 60 fps: tamanhos que somem por mais tempo que isso saem do pool (memória da GPU volta)
+const QUADROS_SEM_USO: u64 = 120;
 
 impl TexturePool {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Fim do quadro: descarta os tamanhos de textura (e globals) sem uso há `QUADROS_SEM_USO` quadros.
+    /// Texturas ainda emprestadas (PoolEntry vivo) continuam válidas: o Arc do pool interno só some depois.
+    pub fn fim_do_quadro(&mut self) {
+        self.quadro += 1;
+        if self.quadro % 30 != 0 {
+            return;
+        }
+        let limite = self.quadro.saturating_sub(QUADROS_SEM_USO);
+        let ultimo = &self.ultimo_uso;
+        self.pools.retain(|k, _| ultimo.get(k).copied().unwrap_or(0) >= limite);
+        self.ultimo_uso.retain(|_, q| *q >= limite);
+        let ultimo_g = &self.ultimo_uso_globals;
+        self.globals_cache.retain(|k, _| ultimo_g.get(k).copied().unwrap_or(0) >= limite);
+        self.ultimo_uso_globals.retain(|_, q| *q >= limite);
     }
 
     pub fn get_texture(
@@ -33,6 +59,7 @@ impl TexturePool {
             format,
             sample_count,
         };
+        self.ultimo_uso.insert(key, self.quadro);
         let pool = self.pools.entry(key).or_insert_with(|| {
             let label = if cfg!(feature = "render_debug_labels") {
                 use std::sync::atomic::{AtomicU32, Ordering};
@@ -66,6 +93,13 @@ impl TexturePool {
         viewport_width: u32,
         viewport_height: u32,
     ) -> Arc<Globals> {
+        self.ultimo_uso_globals.insert(
+            GlobalsKey {
+                viewport_width,
+                viewport_height,
+            },
+            self.quadro,
+        );
         self.globals_cache
             .entry(GlobalsKey {
                 viewport_width,

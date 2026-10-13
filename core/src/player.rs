@@ -1578,7 +1578,16 @@ impl Player {
                 && changed_mouse_buttons.is_empty()
                 && context.mouse_data.hovered.is_some();
 
-            let new_over_object = if mouse_in_stage {
+            // Ruffle Legaxy: com o mouse parado (no celular, o dedo solto fica "parado" no ultimo
+            // toque) o resultado da busca so e usado nos casos abaixo; fora deles a busca pela
+            // arvore toda (~13% da CPU na luta) era jogada fora a cada quadro.
+            let precisa_busca = !skip_mouse_hover
+                || context.mouse_data.hovered.is_some_and(|hovered| {
+                    let hovered = hovered.as_displayobject();
+                    !hovered.visible()
+                        || (!hovered.movie().is_action_script_3() && hovered.avm1_removed())
+                });
+            let new_over_object = if mouse_in_stage && precisa_busca {
                 run_mouse_pick(context, true)
             } else {
                 None

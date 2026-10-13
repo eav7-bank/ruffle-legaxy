@@ -33,6 +33,7 @@ mod input;
 mod library;
 pub mod limits;
 pub mod memoria_n7;
+pub mod perfil_as3;
 pub mod loader;
 mod local_connection;
 mod net_connection;

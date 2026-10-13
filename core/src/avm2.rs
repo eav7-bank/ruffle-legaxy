@@ -621,11 +621,23 @@ impl<'gc> Avm2<'gc> {
 
     /// Pushes an executable on the call stack
     pub fn push_call(&self, mc: &Mutation<'gc>, method: Method<'gc>) {
+        if crate::perfil_as3::ativo() {
+            let id = method.id_perfil();
+            if !crate::perfil_as3::conhece(id) {
+                let mut nome = crate::string::WString::new();
+                crate::avm2::function::display_function(&mut nome, method);
+                crate::perfil_as3::registrar_nome(id, nome.to_string());
+            }
+            crate::perfil_as3::entrar(id);
+        }
         self.call_stack.borrow_mut(mc).push(method)
     }
 
     /// Pops an executable off the call stack
     pub fn pop_call(&self, mc: &Mutation<'gc>) {
+        if crate::perfil_as3::ativo() {
+            crate::perfil_as3::sair();
+        }
         self.call_stack.borrow_mut(mc).pop();
     }
 

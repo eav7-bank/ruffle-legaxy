@@ -156,6 +156,11 @@ impl core::fmt::Debug for Method<'_> {
 }
 
 impl<'gc> Method<'gc> {
+    /// Ruffle Legaxy: identificador estavel (endereco) para o perfilador de AS3.
+    pub fn id_perfil(self) -> usize {
+        Gc::as_ptr(self.0) as usize
+    }
+
     /// Construct a `Method` from an `AbcFile` and method index.
     pub fn from_method_index(
         txunit: TranslationUnit<'gc>,

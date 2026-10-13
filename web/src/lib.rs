@@ -1419,51 +1419,9 @@ fn global_init() {
 // ===== Medicao de memoria (Naruto Legaxy) =====
 // Alocador global que soma/subtrai cada alocacao em `ruffle_core::memoria_n7` (heap vivo real,
 // usado tambem em `System.totalMemory`) e funcoes lidas pela pagina (`instance.exports.n7_*`).
-mod alocador_n7 {
-    use ruffle_core::memoria_n7 as m;
-    use std::alloc::{GlobalAlloc, Layout, System};
-    use std::sync::atomic::Ordering;
-
-    pub struct AlocadorContador;
-
-    unsafe impl GlobalAlloc for AlocadorContador {
-        unsafe fn alloc(&self, l: Layout) -> *mut u8 {
-            let p = unsafe { System.alloc(l) };
-            if p.is_null() {
-                m::ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
-            } else {
-                m::somar_heap(l.size());
-            }
-            p
-        }
-        unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
-            let p = unsafe { System.alloc_zeroed(l) };
-            if p.is_null() {
-                m::ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
-            } else {
-                m::somar_heap(l.size());
-            }
-            p
-        }
-        unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
-            unsafe { System.dealloc(p, l) };
-            m::subtrair_heap(l.size());
-        }
-        unsafe fn realloc(&self, p: *mut u8, l: Layout, novo: usize) -> *mut u8 {
-            let q = unsafe { System.realloc(p, l, novo) };
-            if q.is_null() {
-                m::ALOC_FALHOU.store(novo, Ordering::Relaxed);
-            } else {
-                m::subtrair_heap(l.size());
-                m::somar_heap(novo);
-            }
-            q
-        }
-    }
-
-    #[global_allocator]
-    static ALOCADOR: AlocadorContador = AlocadorContador;
-}
+// o alocador contador agora mora no ruffle_core (o app Android e o desktop usam o mesmo)
+#[global_allocator]
+static ALOCADOR_N7: ruffle_core::memoria_n7::AlocadorContador = ruffle_core::memoria_n7::AlocadorContador;
 
 /// Contadores de memoria, na ordem: heap vivo, pico do heap, ultima alocacao que falhou,
 /// BitmapData vivos, bytes de pixels proprios, BitmapData criados, dispose(), simbolos

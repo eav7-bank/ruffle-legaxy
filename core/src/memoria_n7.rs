@@ -96,3 +96,46 @@ pub fn fator_coleta_por_quadro() -> f64 {
 
 /// Quadros do SWF executados (`Player::run_frame`): fps real do conteudo.
 pub static QUADROS_EXECUTADOS: AtomicU64 = AtomicU64::new(0);
+
+// ===== Ruffle Legaxy mobile (fase 1): alocador contador, memoria da GPU e pressao de memoria =====
+
+/// Alocador global que soma/subtrai cada alocacao em [`HEAP_VIVO`]. O frontend declara
+/// `#[global_allocator] static A: ruffle_core::memoria_n7::AlocadorContador = AlocadorContador;`
+/// (web, app Android, desktop). Sem ele o heap fica em 0 e `System.totalMemory` cai no valor fixo
+/// antigo (90 MB) — e o jogo NUNCA libera os recursos de luta, que ele so solta acima de 700 MB.
+pub struct AlocadorContador;
+
+unsafe impl std::alloc::GlobalAlloc for AlocadorContador {
+    unsafe fn alloc(&self, l: std::alloc::Layout) -> *mut u8 {
+        let p = unsafe { std::alloc::System.alloc(l) };
+        if p.is_null() {
+            ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
+        } else {
+            somar_heap(l.size());
+        }
+        p
+    }
+    unsafe fn alloc_zeroed(&self, l: std::alloc::Layout) -> *mut u8 {
+        let p = unsafe { std::alloc::System.alloc_zeroed(l) };
+        if p.is_null() {
+            ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
+        } else {
+            somar_heap(l.size());
+        }
+        p
+    }
+    unsafe fn dealloc(&self, p: *mut u8, l: std::alloc::Layout) {
+        unsafe { std::alloc::System.dealloc(p, l) };
+        subtrair_heap(l.size());
+    }
+    unsafe fn realloc(&self, p: *mut u8, l: std::alloc::Layout, novo: usize) -> *mut u8 {
+        let q = unsafe { std::alloc::System.realloc(p, l, novo) };
+        if q.is_null() {
+            ALOC_FALHOU.store(novo, Ordering::Relaxed);
+        } else {
+            subtrair_heap(l.size());
+            somar_heap(novo);
+        }
+        q
+    }
+}

@@ -482,6 +482,10 @@ pub(super) fn run_pixelbender_shader_impl(
                         );
 
                         BitmapHandle(Arc::new(Texture {
+                            conta: ruffle_render::memoria::ContaTextura::new(
+                                fresh_texture.width(),
+                                fresh_texture.height(),
+                            ),
                             texture: fresh_texture,
                             repeating_linear: Default::default(),
                             repeating_nearest: Default::default(),

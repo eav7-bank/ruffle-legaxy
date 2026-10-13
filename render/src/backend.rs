@@ -109,6 +109,10 @@ pub trait RenderBackend: Any {
 
     fn set_quality(&mut self, quality: StageQuality);
 
+    /// Ruffle Legaxy: larga caches internos (texturas reaproveitaveis entre quadros etc.) quando o
+    /// sistema avisa pouca memoria. Eles voltam a ser criados sob demanda.
+    fn liberar_caches(&mut self) {}
+
     fn compile_pixelbender_shader(
         &mut self,
         shader: PixelBenderShader,

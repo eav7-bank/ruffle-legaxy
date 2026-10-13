@@ -503,6 +503,11 @@ impl<T: RenderTarget + 'static> RenderBackend for WgpuRenderBackend<T> {
         }
     }
 
+    fn liberar_caches(&mut self) {
+        self.texture_pool = TexturePool::new();
+        self.offscreen_texture_pool = TexturePool::new();
+    }
+
     fn set_quality(&mut self, quality: StageQuality) {
         self.surface = Surface::new(
             &self.descriptors,
@@ -723,6 +728,7 @@ impl<T: RenderTarget + 'static> RenderBackend for WgpuRenderBackend<T> {
         );
 
         let handle = BitmapHandle(Arc::new(Texture {
+            conta: ruffle_render::memoria::ContaTextura::new(texture.width(), texture.height()),
             texture,
             repeating_linear: Default::default(),
             repeating_nearest: Default::default(),
@@ -1001,6 +1007,7 @@ impl<T: RenderTarget + 'static> RenderBackend for WgpuRenderBackend<T> {
                             | wgpu::TextureUsages::COPY_SRC,
                     });
                 BitmapHandle(Arc::new(Texture {
+                    conta: ruffle_render::memoria::ContaTextura::new(texture.width(), texture.height()),
                     texture,
                     repeating_linear: Default::default(),
                     repeating_nearest: Default::default(),
@@ -1161,6 +1168,7 @@ impl<T: RenderTarget + 'static> RenderBackend for WgpuRenderBackend<T> {
                     | wgpu::TextureUsages::COPY_SRC,
             });
         Ok(BitmapHandle(Arc::new(Texture {
+            conta: ruffle_render::memoria::ContaTextura::new(texture.width(), texture.height()),
             texture,
             repeating_linear: Default::default(),
             repeating_nearest: Default::default(),

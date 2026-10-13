@@ -19,6 +19,9 @@ pub static BMP_VIVOS: AtomicU64 = AtomicU64::new(0);
 pub static BMP_BYTES: AtomicU64 = AtomicU64::new(0);
 /// `BitmapRawData` criados desde o inicio.
 pub static BMP_CRIADOS: AtomicU64 = AtomicU64::new(0);
+/// Bytes de pixels novos alocados desde o inicio (BitmapData proprios + simbolos decodificados).
+/// Guia a coleta: memoria fora do gc-arena que so volta quando o coletor passa.
+pub static BMP_BYTES_NOVOS: AtomicU64 = AtomicU64::new(0);
 /// `BitmapData.dispose()` chamados.
 pub static BMP_DISPOSE: AtomicU64 = AtomicU64::new(0);
 /// Simbolos de bitmap decodificados (PNG/JPEG -> pixels).
@@ -129,6 +132,7 @@ impl ContadorBitmap {
         BMP_CRIADOS.fetch_add(1, Ordering::Relaxed);
         BMP_BYTES.fetch_add(bytes, Ordering::Relaxed);
         bmp_somar(bytes);
+        BMP_BYTES_NOVOS.fetch_add(bytes, Ordering::Relaxed);
         Self(std::cell::Cell::new(bytes))
     }
 
@@ -140,6 +144,9 @@ impl ContadorBitmap {
         BMP_BYTES.fetch_add(bytes, Ordering::Relaxed);
         bmp_subtrair(antes);
         bmp_somar(bytes);
+        if bytes > antes {
+            BMP_BYTES_NOVOS.fetch_add(bytes - antes, Ordering::Relaxed);
+        }
         self.0.set(bytes);
     }
 
@@ -157,9 +164,46 @@ impl Drop for ContadorBitmap {
     }
 }
 
-/// Divida de GC por quadro, em fracao do numero de objetos vivos (bits de f64). Padrao 0,004
-/// (~1 ciclo completo a cada 10 s a 30 fps). 0 desliga.
-pub static FATOR_COLETA_POR_QUADRO: AtomicU64 = AtomicU64::new(0x3F70624DD2F1A9FC);
+/// Divida de GC por quadro, em fracao do numero de objetos vivos (bits de f64). Padrao 0,001
+/// (~1 ciclo completo a cada ~20 s a 30 fps so por ela; a alocacao normal soma mais). 0 desliga.
+/// Fase 3: era 0,004 fixo (um ciclo a cada ~5 s, ~10% do tempo da cidade no coletor); agora a
+/// parte grande vem de [`divida_coleta_do_quadro`], guiada pelos bytes de bitmap novos.
+pub static FATOR_COLETA_POR_QUADRO: AtomicU64 = AtomicU64::new(0x3F50624DD2F1A9FC);
+
+/// Bytes de bitmap novos que valem um ciclo completo extra do coletor.
+pub const BYTES_POR_CICLO: f64 = 32.0 * 1024.0 * 1024.0;
+/// Teto da divida guiada por bitmap paga por quadro (fracao dos objetos vivos): espalha o ciclo
+/// por varios quadros em vez de parar um quadro so quando a luta carrega 100 MB de imagens.
+pub const TETO_POR_QUADRO: f64 = 0.01;
+/// Fator base enquanto o sistema avisa pouca memoria (o padrao antigo, 0,004).
+pub const FATOR_SOB_PRESSAO: f64 = 0.004;
+/// Trabalho de um ciclo completo por objeto vivo (marcar + rastrear + manter, `Pacing::DEFAULT`).
+const TRABALHO_POR_OBJETO: f64 = 0.55;
+
+static BMP_BYTES_VISTOS: AtomicU64 = AtomicU64::new(0);
+/// Divida pendente guiada por bitmap, em fracao dos objetos vivos (bits de f64).
+static DIVIDA_BITMAP: AtomicU64 = AtomicU64::new(0);
+
+/// Fracao dos objetos vivos a cobrar como divida do coletor neste quadro: base fixa
+/// ([`FATOR_COLETA_POR_QUADRO`]) + parte guiada pelos bytes de bitmap alocados desde o ultimo
+/// quadro (um ciclo a cada [`BYTES_POR_CICLO`]), paga aos poucos ([`TETO_POR_QUADRO`]).
+pub fn divida_coleta_do_quadro() -> f64 {
+    let mut base = fator_coleta_por_quadro();
+    if base <= 0.0 {
+        return 0.0;
+    }
+    // Sistema avisou pouca memoria: volta ao ritmo antigo (um ciclo a cada ~5 s) enquanto durar.
+    if QUADROS_SOB_PRESSAO.load(Ordering::Relaxed) > 0 {
+        base = base.max(FATOR_SOB_PRESSAO);
+    }
+    let novos = BMP_BYTES_NOVOS.load(Ordering::Relaxed);
+    let vistos = BMP_BYTES_VISTOS.swap(novos, Ordering::Relaxed);
+    let mut pendente = f64::from_bits(DIVIDA_BITMAP.load(Ordering::Relaxed));
+    pendente += novos.saturating_sub(vistos) as f64 / BYTES_POR_CICLO * TRABALHO_POR_OBJETO;
+    let pagar = pendente.min(TETO_POR_QUADRO);
+    DIVIDA_BITMAP.store((pendente - pagar).to_bits(), Ordering::Relaxed);
+    base + pagar
+}
 /// Leituras de `System.totalMemory` pelo conteudo.
 pub static LEITURAS_TOTAL_MEMORY: AtomicU64 = AtomicU64::new(0);
 

@@ -185,6 +185,10 @@ impl FonteDoSimbolo {
             transparente,
         };
         crate::memoria_n7::contar(&crate::memoria_n7::SIMBOLOS_DECODIFICADOS);
+        crate::memoria_n7::BMP_BYTES_NOVOS.fetch_add(
+            pixels.len() as u64 * 4,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         Ok(SimboloDecodificado {
             pixels,
             textura,

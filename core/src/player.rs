@@ -2060,13 +2060,14 @@ impl Player {
         crate::memoria_n7::passar_quadro_pressao();
         // Coleta continua (Naruto Legaxy): o gc-arena so comeca um ciclo novo depois de muitas
         // alocacoes de objetos; com o jogo parado (cidade), os bitmaps que o jogo larga ao sair da
-        // luta ficavam vivos por minutos. Uma pequena divida por quadro garante um ciclo completo
-        // a cada ~10 s (a 30 fps), devolvendo a memoria ao nivel de antes da luta.
+        // luta ficavam vivos por minutos. Uma pequena divida por quadro (base) mais uma parte
+        // guiada pelos bytes de bitmap novos (ver `memoria_n7::divida_coleta_do_quadro`) devolve a
+        // memoria ao nivel de antes da luta sem manter o coletor rodando o tempo todo na cidade.
         {
             let arena = self.gc_arena.borrow();
             let m = arena.metrics();
             crate::memoria_n7::OBJETOS_GC.store(m.total_gc_count() as u64, std::sync::atomic::Ordering::Relaxed);
-            let fator = crate::memoria_n7::fator_coleta_por_quadro();
+            let fator = crate::memoria_n7::divida_coleta_do_quadro();
             if fator > 0.0 {
                 m.adjust_debt(m.total_gc_count() as f64 * fator);
             }

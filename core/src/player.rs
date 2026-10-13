@@ -305,6 +305,11 @@ impl<'gc> GcRootData<'gc> {
 
 type GcArena = gc_arena::Arena<Rootable![GcRoot<'_>]>;
 
+/// Divida do coletor paga por `Player::update`, em fracao dos objetos vivos (~7 ms no PC).
+const TETO_DIVIDA_POR_UPDATE: f64 = 0.02;
+/// Divida acumulada (fracao dos objetos vivos) acima da qual `update` paga tudo de uma vez.
+const DIVIDA_MAXIMA: f64 = 1.0;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum RunState {
     Playing,
@@ -2476,7 +2481,25 @@ impl Player {
         self.update_mouse_state(EnumSet::empty(), false, &mut false);
 
         // GC
-        self.gc_arena.borrow_mut().collect_debt();
+        // Ruffle Legaxy: paga no maximo TETO_DIVIDA_POR_UPDATE (fracao dos objetos vivos) por
+        // chamada; o resto fica para as proximas. Ao carregar a luta, a alocacao de um quadro
+        // gerava uma divida enorme paga de uma vez (~45% dos quadros de 200-300 ms). Acima de
+        // DIVIDA_MAXIMA acumulada paga tudo, para a memoria nunca crescer sem limite.
+        {
+            let mut arena = self.gc_arena.borrow_mut();
+            let m = arena.metrics().clone();
+            let vivos = m.total_gc_count() as f64;
+            let divida = m.allocation_debt();
+            let teto = vivos * TETO_DIVIDA_POR_UPDATE;
+            if divida > teto && divida < vivos * DIVIDA_MAXIMA {
+                let sobra = divida - teto;
+                m.adjust_debt(-sobra);
+                arena.collect_debt();
+                m.adjust_debt(sobra);
+            } else {
+                arena.collect_debt();
+            }
+        }
 
         rval
     }

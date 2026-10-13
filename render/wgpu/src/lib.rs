@@ -45,6 +45,12 @@ pub mod clap;
 pub mod descriptors;
 mod dynamic_transforms;
 mod filters;
+
+/// Ruffle Legaxy: limita os passes de desfoque de blur/glow/sombra/bisel (0 = sem limite). O app do celular
+/// usa 1: na cidade cheia as auras (glow) eram metade do tempo de desenho.
+pub fn set_max_blur_passes(passes: u8) {
+    filters::blur::MAX_PASSES_BLUR.store(passes, std::sync::atomic::Ordering::Relaxed);
+}
 mod layouts;
 mod mesh;
 mod shaders;

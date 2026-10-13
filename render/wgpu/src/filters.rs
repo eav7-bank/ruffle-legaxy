@@ -1,5 +1,5 @@
 mod bevel;
-mod blur;
+pub(crate) mod blur;
 mod color_matrix;
 mod displacement_map;
 mod drop_shadow;

@@ -1,4 +1,6 @@
 use crate::backend::RenderTargetMode;
+/// Ruffle Legaxy: teto global de passes de desfoque (0 = sem teto, como o Flash). Ver `set_max_blur_passes`.
+pub static MAX_PASSES_BLUR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 use crate::buffer_pool::TexturePool;
 use crate::descriptors::Descriptors;
 use crate::filters::{FilterSource, FilterVertex, VERTEX_BUFFERS_DESCRIPTION_FILTERS};
@@ -192,7 +194,11 @@ impl BlurFilter {
 
         let source_view = source.texture.create_view(&Default::default());
         let mut first = true;
-        for _ in 0..(filter.num_passes() as usize) {
+        // Ruffle Legaxy: teto de passes de desfoque (o app do celular usa 1, como o Flash em qualidade baixa).
+        // Na cidade cheia cada aura (glow) refazia até 3x2 passes em resolução cheia a cada quadro.
+        let teto = MAX_PASSES_BLUR.load(std::sync::atomic::Ordering::Relaxed);
+        let passes = if teto > 0 { filter.num_passes().min(teto) } else { filter.num_passes() };
+        for _ in 0..(passes as usize) {
             for i in 0..2 {
                 let horizontal = i % 2 == 0;
                 let strength = if horizontal {

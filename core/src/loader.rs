@@ -1873,8 +1873,28 @@ impl<'gc> MovieLoader<'gc> {
                 // This will construct AVM2-side objects even under AVM1, but it doesn't matter,
                 // since Bitmap and BitmapData never have AVM1-side objects.
                 let _etq = crate::memoria_n7::Etiqueta::nova(1);
-                // JPEG comum: direto no buffer final (sem RGB intermediario); resto: caminho normal
-                let bitmapdata = match crate::bitmap::jpeg_n7::decodificar_direto(data) {
+                // JPEG (Naruto Legaxy): guarda compactado e so decodifica quando o conteudo usar os
+                // pixels (como o Flash). O jogo carrega ~10 modelos de uma vez na luta (cor + alfa
+                // de cada tira, ate 27900x1664) e so os usa quando recorta os quadros, um por vez:
+                // decodificar na chegada deixava todas as tiras decodificadas ao mesmo tempo.
+                let preguicoso = if determine_jpeg_tag_format(data) == JpegTagFormat::Jpeg {
+                    ruffle_render::utils::decode_define_bits_jpeg_dimensions(data)
+                        .ok()
+                        .filter(|(w, h)| *w > 0 && *h > 0)
+                } else {
+                    None
+                };
+                let bitmapdata = if let Some((w, h)) = preguicoso {
+                    let fonte = crate::character::FonteDoSimbolo::avulsa(
+                        crate::character::CompressedBitmap::Jpeg {
+                            data: data.to_vec(),
+                            alpha: None,
+                            width: w,
+                            height: h,
+                        },
+                    );
+                    BitmapData::new_preguicoso(activation.gc(), w, h, false, std::rc::Rc::new(fonte))
+                } else { match crate::bitmap::jpeg_n7::decodificar_direto(data) {
                     Some((w, h, pixels)) => {
                         BitmapData::new_with_pixels(activation.gc(), w, h, false, pixels)
                     }
@@ -1889,9 +1909,11 @@ impl<'gc> MovieLoader<'gc> {
                             bitmap.as_colors().map(Color::from).collect(),
                         )
                     }
-                };
+                } };
 
-                activation.context.library.vigiar_bitmap(bitmapdata);
+                if preguicoso.is_none() {
+                    activation.context.library.vigiar_bitmap(bitmapdata);
+                }
                 let bitmapdata_avm2 =
                     BitmapDataObject::from_bitmap_data(activation.context, bitmapdata);
 

@@ -63,6 +63,7 @@ pub fn somar_heap(n: usize) {
     let v = HEAP_VIVO.fetch_add(n, Ordering::Relaxed) + n;
     if v > HEAP_PICO.load(Ordering::Relaxed) {
         HEAP_PICO.store(v, Ordering::Relaxed);
+        foto_do_pico();
     }
 }
 
@@ -399,4 +400,25 @@ pub static VIGIADAS: AtomicU64 = AtomicU64::new(0);
 #[inline]
 pub fn quadro_atual() -> u64 {
     QUADROS_EXECUTADOS.load(Ordering::Relaxed)
+}
+
+/// Imagens do Loader lidas no formato compacto do JPEG (sem decodificar para RGBA).
+pub static LEITURAS_COMPACTAS: AtomicU64 = AtomicU64::new(0);
+
+/// Composicao da memoria no instante do maior pico: [peq, med, gde, bmp proprios, etiquetas 0..7,
+/// ByteArray, quadro].
+pub static FOTO_PICO: [AtomicU64; 14] = [const { AtomicU64::new(0) }; 14];
+
+#[cold]
+fn foto_do_pico() {
+    let r = Ordering::Relaxed;
+    for k in 0..3 {
+        FOTO_PICO[k].store(HEAP_CLASSE[k].load(r) as u64, r);
+    }
+    FOTO_PICO[3].store(BMP_BYTES.load(r), r);
+    for k in 0..8 {
+        FOTO_PICO[4 + k].store(GRANDES_POR_ETIQUETA[k].load(r) as u64, r);
+    }
+    FOTO_PICO[12].store(BYTEARRAY_BYTES.load(r) as u64, r);
+    FOTO_PICO[13].store(QUADROS_EXECUTADOS.load(r), r);
 }

@@ -49,8 +49,11 @@ pub fn copy_on_cpu<'gc>(
                         (source_region.x_min + (source_region.y_min + y) * source.width()) as usize;
                     let dest_start =
                         (dest_region.x_min + (dest_region.y_min + y) * dest.width()) as usize;
-                    dest.raw_pixels_mut()[dest_start..dest_start + width]
-                        .copy_from_slice(&source.raw_pixels()[src_start..src_start + width]);
+                    // ler_pixels: le a origem sem decodifica-la inteira se ela so esta sendo lida
+                    source.ler_pixels(
+                        src_start,
+                        &mut dest.raw_pixels_mut()[dest_start..dest_start + width],
+                    );
                 }
             }
         } else {

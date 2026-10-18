@@ -56,6 +56,7 @@ impl<'gc> BitmapCharacter<'gc> {
             fonte: Rc::new(FonteDoSimbolo {
                 compressed,
                 compartilhado: RefCell::new(PixelsDoSimbolo::default()),
+                leitura_compacta: false,
             }),
             handle: OnceCell::default(),
             avm2_class: Lock::new(BitmapClass::NoSubclass),
@@ -87,6 +88,8 @@ impl<'gc> BitmapCharacter<'gc> {
 pub struct FonteDoSimbolo {
     compressed: CompressedBitmap,
     compartilhado: RefCell<PixelsDoSimbolo>,
+    /// Imagem de `Loader.loadBytes` (so dela): enquanto so for lida, fica no formato do JPEG.
+    leitura_compacta: bool,
 }
 
 impl std::fmt::Debug for FonteDoSimbolo {
@@ -96,6 +99,31 @@ impl std::fmt::Debug for FonteDoSimbolo {
 }
 
 impl FonteDoSimbolo {
+    /// Fonte avulsa (ex.: JPEG recebido por `Loader.loadBytes`), decodificada so no 1o uso.
+    pub fn avulsa(compressed: CompressedBitmap) -> Self {
+        Self {
+            compressed,
+            compartilhado: RefCell::new(PixelsDoSimbolo::default()),
+            leitura_compacta: true,
+        }
+    }
+
+    /// Pixels no formato de origem do JPEG, para leitura (so fonte avulsa de JPEG sem alfa).
+    pub fn pixels_compactos(&self) -> Option<crate::bitmap::jpeg_n7::PixelsCompactos> {
+        if !self.leitura_compacta {
+            return None;
+        }
+        match &self.compressed {
+            CompressedBitmap::Jpeg {
+                data,
+                alpha: None,
+                width,
+                height,
+            } => crate::bitmap::jpeg_n7::decodificar_compacto(data, *width, *height),
+            _ => None,
+        }
+    }
+
     pub fn size(&self) -> BitmapSize {
         self.compressed.size()
     }

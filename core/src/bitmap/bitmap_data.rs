@@ -464,6 +464,11 @@ pub struct BitmapRawData<'gc> {
     #[collect(require_static)]
     compactado: std::cell::RefCell<Option<Vec<u8>>>,
 
+    /// Pixels no formato de origem do JPEG (RGB ou cinza) enquanto a imagem so for LIDA
+    /// (copyPixels/copyChannel/getPixel); qualquer outro uso decodifica `pixels` e solta isto.
+    #[collect(require_static)]
+    leitura_compacta: std::cell::RefCell<Option<Arc<crate::bitmap::jpeg_n7::PixelsCompactos>>>,
+
     /// Quadro do ultimo acesso da CPU aos pixels.
     #[collect(require_static)]
     ultimo_acesso: std::cell::Cell<u64>,
@@ -592,6 +597,7 @@ mod wrapper {
                     pixels: std::cell::OnceCell::from(Arc::new(Vec::new())),
                     fonte: None,
                     compactado: Default::default(),
+                    leitura_compacta: Default::default(),
                     ultimo_acesso: Default::default(),
                     nao_compacta: Default::default(),
                     textura_compartilhada: std::cell::OnceCell::new(),
@@ -621,6 +627,7 @@ mod wrapper {
                 pixels: std::cell::OnceCell::from(Arc::clone(data.px())),
                 fonte: None,
                 compactado: Default::default(),
+                leitura_compacta: Default::default(),
                 ultimo_acesso: Default::default(),
                 nao_compacta: Default::default(),
                 textura_compartilhada: std::cell::OnceCell::new(),
@@ -879,6 +886,7 @@ impl<'gc> BitmapRawData<'gc> {
             textura_compartilhada: OnceCell::new(),
             fonte: None,
             compactado: Default::default(),
+            leitura_compacta: Default::default(),
             ultimo_acesso: std::cell::Cell::new(crate::memoria_n7::quadro_atual()),
             nao_compacta: Default::default(),
             pixels: OnceCell::from(Arc::new(vec![
@@ -910,6 +918,7 @@ impl<'gc> BitmapRawData<'gc> {
             pixels: OnceCell::from(Arc::new(pixels)),
             fonte: None,
             compactado: Default::default(),
+            leitura_compacta: Default::default(),
             ultimo_acesso: std::cell::Cell::new(crate::memoria_n7::quadro_atual()),
             nao_compacta: Default::default(),
             textura_compartilhada: OnceCell::new(),
@@ -958,6 +967,7 @@ impl<'gc> BitmapRawData<'gc> {
     fn px(&self) -> &Arc<Vec<Color>> {
         self.ultimo_acesso.set(crate::memoria_n7::quadro_atual());
         self.pixels.get_or_init(|| {
+            self.leitura_compacta.borrow_mut().take();
             if let Some(c) = self.compactado.borrow_mut().take() {
                 return Arc::new(self.descompactar(&c));
             }
@@ -978,6 +988,35 @@ impl<'gc> BitmapRawData<'gc> {
                 }
             }
         })
+    }
+
+    /// Leitura compacta disponivel (imagem JPEG do Loader ainda nao decodificada por completo).
+    fn compacta(&self) -> Option<Arc<crate::bitmap::jpeg_n7::PixelsCompactos>> {
+        if self.pixels.get().is_some() {
+            return None;
+        }
+        if let Some(c) = self.leitura_compacta.borrow().as_ref() {
+            self.ultimo_acesso.set(crate::memoria_n7::quadro_atual());
+            return Some(c.clone());
+        }
+        let fonte = self.fonte.as_ref()?;
+        let c = Arc::new(fonte.pixels_compactos()?);
+        crate::memoria_n7::contar(&crate::memoria_n7::LEITURAS_COMPACTAS);
+        *self.leitura_compacta.borrow_mut() = Some(c.clone());
+        self.ultimo_acesso.set(crate::memoria_n7::quadro_atual());
+        Some(c)
+    }
+
+    /// Copia `destino.len()` pixels a partir do indice `inicio` (sem decodificar a imagem inteira
+    /// quando ela so esta sendo lida).
+    pub fn ler_pixels(&self, inicio: usize, destino: &mut [Color]) {
+        if let Some(c) = self.compacta() {
+            for (k, d) in destino.iter_mut().enumerate() {
+                *d = c.cor(inicio + k);
+            }
+        } else {
+            destino.copy_from_slice(&self.px()[inicio..inicio + destino.len()]);
+        }
     }
 
     fn descompactar(&self, c: &[u8]) -> Vec<Color> {
@@ -1090,6 +1129,7 @@ impl<'gc> BitmapRawData<'gc> {
         self.textura_compartilhada = OnceCell::new();
         self.fonte = None;
         self.compactado = Default::default();
+        self.leitura_compacta = Default::default();
         self.pixels = OnceCell::from(Arc::new(Vec::new())); // free the CPU pixel buffer
         self.contador.dispose();
         self.bitmap_handle = None;
@@ -1108,11 +1148,15 @@ impl<'gc> BitmapRawData<'gc> {
 
         // simbolo ainda nao decodificado: se outra instancia viva ja registrou a textura do
         // simbolo na GPU, desenha com ela sem decodificar; senao decodifica agora
+        // decodificou SO para mandar a textura a GPU: depois do envio solta a copia da CPU (o
+        // simbolo e decodificado de novo se o conteudo ler os pixels)
+        let mut so_para_envio = false;
         if self.pixels.get().is_none() {
             if let Some(t) = self.fonte.as_ref().and_then(|f| f.textura_registrada()) {
                 let _ = self.textura_compartilhada.set(t);
             } else {
                 self.px();
+                so_para_envio = self.fonte.is_some();
             }
         }
 
@@ -1133,6 +1177,10 @@ impl<'gc> BitmapRawData<'gc> {
             let _ = textura.handle.set(handle.clone());
             self.dirty_state = DirtyState::Clean;
             self.bitmap_handle = Some(handle.clone());
+            if so_para_envio {
+                self.pixels = OnceCell::new();
+                crate::memoria_n7::contar(&crate::memoria_n7::SIMBOLOS_SOLTOS);
+            }
             return Ok(handle);
         }
 
@@ -1243,7 +1291,16 @@ impl<'gc> BitmapRawData<'gc> {
 
     #[inline]
     pub fn get_pixel32_raw(&self, x: u32, y: u32) -> Color {
-        self.px()[(x + y * self.width()) as usize]
+        let i = (x + y * self.width()) as usize;
+        if self.pixels.get().is_none() {
+            if let Some(c) = self.leitura_compacta.borrow().as_ref() {
+                return c.cor(i);
+            }
+            if let Some(c) = self.compacta() {
+                return c.cor(i);
+            }
+        }
+        self.px()[i]
     }
 
     pub fn raw_pixels_mut(&mut self) -> &mut Vec<Color> {

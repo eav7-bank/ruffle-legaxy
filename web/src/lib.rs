@@ -1472,6 +1472,8 @@ pub fn n7_memoria(i: u32) -> f64 {
         39 => m::DESCOMPACTADAS.load(Relaxed) as f64,
         40 => m::SIMBOLOS_SOLTOS.load(Relaxed) as f64,
         41 => m::VIGIADAS.load(Relaxed) as f64,
+        42 => m::LEITURAS_COMPACTAS.load(Relaxed) as f64,
+        43..=56 => m::FOTO_PICO[(i - 43) as usize].load(Relaxed) as f64,
         _ => -1.0,
     }
 }

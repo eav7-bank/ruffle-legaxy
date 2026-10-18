@@ -49,3 +49,68 @@ pub fn decodificar_direto(data: &[u8]) -> Option<(u32, u32, Vec<Color>)> {
     }
     Some((w as u32, h as u32, pixels))
 }
+
+/// Pixels de um JPEG no formato de origem, so para LEITURA (ver `BitmapRawData::leitura`):
+/// `Rgb` = 3 bytes por pixel, `Cinza` = 1 byte por pixel (opacos).
+#[derive(Debug)]
+pub enum PixelsCompactos {
+    Rgb(Vec<u8>),
+    Cinza(Vec<u8>),
+}
+
+impl PixelsCompactos {
+    #[inline]
+    pub fn cor(&self, i: usize) -> Color {
+        match self {
+            PixelsCompactos::Rgb(d) => Color::rgba(d[i * 3], d[i * 3 + 1], d[i * 3 + 2], 255),
+            PixelsCompactos::Cinza(d) => Color::rgba(d[i], d[i], d[i], 255),
+        }
+    }
+
+    pub fn bytes(&self) -> usize {
+        match self {
+            PixelsCompactos::Rgb(d) | PixelsCompactos::Cinza(d) => d.len(),
+        }
+    }
+}
+
+/// Decodifica um JPEG comum (sem alfa separado) no formato de origem: RGB (3 bytes/pixel) ou
+/// cinza (1 byte/pixel). `None` = usar o caminho normal.
+pub fn decodificar_compacto(data: &[u8], w: u32, h: u32) -> Option<PixelsCompactos> {
+    if determine_jpeg_tag_format(data) != JpegTagFormat::Jpeg {
+        return None;
+    }
+    let data = remove_invalid_jpeg_data(data);
+    let mut cabecalho = JpegDecoder::new_with_options(
+        ZCursor::new(&data[..]),
+        DecoderOptions::default()
+            .set_max_width(u16::MAX as usize)
+            .set_max_height(u16::MAX as usize),
+    );
+    cabecalho.decode_headers().ok()?;
+    let saida = match cabecalho.input_colorspace()? {
+        ColorSpace::YCbCr | ColorSpace::RGB => ColorSpace::RGB,
+        ColorSpace::Luma => ColorSpace::Luma,
+        _ => return None,
+    };
+    let opcoes = DecoderOptions::default()
+        .jpeg_set_out_colorspace(saida)
+        .set_max_width(u16::MAX as usize)
+        .set_max_height(u16::MAX as usize);
+    let mut decoder = JpegDecoder::new_with_options(ZCursor::new(&data[..]), opcoes);
+    decoder.decode_headers().ok()?;
+    if decoder.output_colorspace()? != saida {
+        return None;
+    }
+    let (dw, dh) = decoder.dimensions()?;
+    if dw != w as usize || dh != h as usize {
+        return None;
+    }
+    let mut buf = vec![0u8; decoder.output_buffer_size()?];
+    decoder.decode_into(&mut buf).ok()?;
+    Some(if saida == ColorSpace::Luma {
+        PixelsCompactos::Cinza(buf)
+    } else {
+        PixelsCompactos::Rgb(buf)
+    })
+}

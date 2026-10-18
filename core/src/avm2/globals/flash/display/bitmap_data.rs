@@ -75,24 +75,15 @@ pub fn fill_bitmap_data_from_symbol<'gc>(
     bd: &BitmapCharacter<'gc>,
 ) -> BitmapData<'gc> {
     // Os pixels decodificados sao compartilhados (copy-on-write) por todas as instancias vivas do
-    // simbolo: `new ClasseDoQuadro()` a cada quadro nao decodifica nem aloca de novo.
-    let d = bd
-        .pixels_compartilhados()
-        .expect("Failed to decode BitmapData");
-    if d.decodificou {
-        crate::bitmap::bitmap_data::cobrar_divida_pixels(
-            activation.context.gc_context,
-            d.width,
-            d.height,
-        );
-    }
-    BitmapData::new_compartilhado(
+    // simbolo: `new ClasseDoQuadro()` a cada quadro nao decodifica nem aloca de novo. E, como no
+    // Flash, a imagem so e decodificada quando os pixels forem usados (decodificacao preguicosa).
+    let tam = bd.compressed().size();
+    BitmapData::new_preguicoso(
         activation.context.gc_context,
-        d.width,
-        d.height,
+        tam.width,
+        tam.height,
         true,
-        d.pixels,
-        d.textura,
+        bd.fonte(),
     )
 }
 

@@ -61,6 +61,9 @@ flv-rs = { path = "../flv" }
 async-channel = { workspace = true }
 jpegxr = { workspace = true, optional = true }
 image = { workspace = true, features = ["tiff"] }
+# Naruto Legaxy: JPEG decodificado direto no buffer final (src/bitmap/jpeg_n7.rs)
+zune-jpeg = { version = "0.5.15", default-features = false, features = ["std"] }
+zune-core = { version = "0.5.3", default-features = false, features = ["std"] }
 enum-map = { workspace = true }
 ttf-parser = "0.25"
 num-bigint = "0.4"

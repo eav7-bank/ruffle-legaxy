@@ -28,8 +28,29 @@ pub static SIMBOLOS_REAPROVEITADOS: AtomicU64 = AtomicU64::new(0);
 /// Texturas de GPU registradas para BitmapData.
 pub static TEXTURAS_REGISTRADAS: AtomicU64 = AtomicU64::new(0);
 
+/// Bytes vivos por tamanho de bloco: [< 4 KiB, 4 KiB..1 MiB, >= 1 MiB] (objetos AS3 e estruturas
+/// pequenas x buffers medios x pixels/arquivos grandes) e quantos blocos >= 1 MiB estao vivos.
+pub static HEAP_CLASSE: [AtomicUsize; 3] = [AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0)];
+pub static BLOCOS_GRANDES: AtomicUsize = AtomicUsize::new(0);
+
+#[inline]
+fn classe(n: usize) -> usize {
+    if n < 4096 {
+        0
+    } else if n < 1024 * 1024 {
+        1
+    } else {
+        2
+    }
+}
+
 #[inline]
 pub fn somar_heap(n: usize) {
+    let c = classe(n);
+    HEAP_CLASSE[c].fetch_add(n, Ordering::Relaxed);
+    if c == 2 {
+        BLOCOS_GRANDES.fetch_add(1, Ordering::Relaxed);
+    }
     let v = HEAP_VIVO.fetch_add(n, Ordering::Relaxed) + n;
     if v > HEAP_PICO.load(Ordering::Relaxed) {
         HEAP_PICO.store(v, Ordering::Relaxed);
@@ -38,6 +59,11 @@ pub fn somar_heap(n: usize) {
 
 #[inline]
 pub fn subtrair_heap(n: usize) {
+    let c = classe(n);
+    HEAP_CLASSE[c].fetch_sub(n, Ordering::Relaxed);
+    if c == 2 {
+        BLOCOS_GRANDES.fetch_sub(1, Ordering::Relaxed);
+    }
     HEAP_VIVO.fetch_sub(n, Ordering::Relaxed);
 }
 
@@ -112,6 +138,9 @@ unsafe impl std::alloc::GlobalAlloc for AlocadorContador {
             ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
         } else {
             somar_heap(l.size());
+            if l.size() >= 1024 * 1024 {
+                grande_alocado(p as usize, l.size());
+            }
         }
         p
     }
@@ -121,10 +150,16 @@ unsafe impl std::alloc::GlobalAlloc for AlocadorContador {
             ALOC_FALHOU.store(l.size(), Ordering::Relaxed);
         } else {
             somar_heap(l.size());
+            if l.size() >= 1024 * 1024 {
+                grande_alocado(p as usize, l.size());
+            }
         }
         p
     }
     unsafe fn dealloc(&self, p: *mut u8, l: std::alloc::Layout) {
+        if l.size() >= 1024 * 1024 {
+            grande_liberado(p as usize);
+        }
         unsafe { std::alloc::System.dealloc(p, l) };
         subtrair_heap(l.size());
     }
@@ -133,8 +168,14 @@ unsafe impl std::alloc::GlobalAlloc for AlocadorContador {
         if q.is_null() {
             ALOC_FALHOU.store(novo, Ordering::Relaxed);
         } else {
+            if l.size() >= 1024 * 1024 {
+                grande_liberado(p as usize);
+            }
             subtrair_heap(l.size());
             somar_heap(novo);
+            if novo >= 1024 * 1024 {
+                grande_alocado(q as usize, novo);
+            }
         }
         q
     }
@@ -193,3 +234,83 @@ pub fn memoria_do_jogo() -> Option<f64> {
 
 /// Objetos vivos no coletor (gc-arena), atualizado a cada quadro executado.
 pub static OBJETOS_GC: AtomicU64 = AtomicU64::new(0);
+
+/// Bytes (capacidade) dos `ByteArray` vivos e quantos estao vivos.
+pub static BYTEARRAY_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+#[inline]
+pub fn ajustar_bytearray(antes: usize, depois: usize) {
+    if depois > antes {
+        BYTEARRAY_BYTES.fetch_add(depois - antes, Ordering::Relaxed);
+    } else if antes > depois {
+        BYTEARRAY_BYTES.fetch_sub(antes - depois, Ordering::Relaxed);
+    }
+}
+
+// ===== Diagnostico: quem segura os blocos grandes (>= 1 MiB) =====
+// Etiqueta corrente (o wasm e de uma thread so): os blocos grandes alocados enquanto ela vale
+// ficam contados nela ate serem liberados. 0 = outros, 1 = imagem do Loader (loadBytes),
+// 2 = SWF carregado, 3 = BitmapData, 5 = render, 6 = quadro (AS3/timeline).
+pub static ETIQUETA: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+pub static GRANDES_POR_ETIQUETA: [AtomicUsize; 8] = [
+    AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0),
+    AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0),
+];
+const MAX_GRANDES: usize = 4096;
+static TRAVA_GRANDES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static mut GRANDES: [(usize, usize, u8); MAX_GRANDES] = [(0, 0, 0); MAX_GRANDES];
+
+pub struct Etiqueta(u8);
+impl Etiqueta {
+    #[inline]
+    pub fn nova(e: u8) -> Self {
+        Etiqueta(ETIQUETA.swap(e, Ordering::Relaxed))
+    }
+}
+impl Drop for Etiqueta {
+    #[inline]
+    fn drop(&mut self) {
+        ETIQUETA.store(self.0, Ordering::Relaxed);
+    }
+}
+
+fn travar() {
+    while TRAVA_GRANDES
+        .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
+        .is_err()
+    {
+        std::hint::spin_loop();
+    }
+}
+
+#[allow(static_mut_refs)]
+fn grande_alocado(p: usize, n: usize) {
+    let e = ETIQUETA.load(Ordering::Relaxed);
+    travar();
+    unsafe {
+        for slot in GRANDES.iter_mut() {
+            if slot.0 == 0 {
+                *slot = (p, n, e);
+                GRANDES_POR_ETIQUETA[(e & 7) as usize].fetch_add(n, Ordering::Relaxed);
+                break;
+            }
+        }
+    }
+    TRAVA_GRANDES.store(false, Ordering::Release);
+}
+
+#[allow(static_mut_refs)]
+fn grande_liberado(p: usize) {
+    travar();
+    unsafe {
+        for slot in GRANDES.iter_mut() {
+            if slot.0 == p {
+                GRANDES_POR_ETIQUETA[(slot.2 & 7) as usize].fetch_sub(slot.1, Ordering::Relaxed);
+                *slot = (0, 0, 0);
+                break;
+            }
+        }
+    }
+    TRAVA_GRANDES.store(false, Ordering::Release);
+}
+

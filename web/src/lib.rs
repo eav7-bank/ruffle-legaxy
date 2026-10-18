@@ -323,6 +323,15 @@ impl RuffleHandle {
         self.with_core(|core| core.is_playing()).unwrap_or_default()
     }
 
+    /// Naruto Legaxy: pouca memoria (a pagina mede a memoria do wasm). Fecha o ciclo do coletor,
+    /// larga os caches do renderizador e faz o jogo ver memoria alta por ~90 s, para ele soltar o
+    /// que libera por memoria na proxima troca de tela.
+    pub fn liberar_memoria(&self) {
+        let _ = self.with_core_mut(|core| {
+            core.liberar_memoria();
+        });
+    }
+
     /// Switches to background tick mode, pausing the normal animation loop.
     /// Use `tick_for_background` to advance the player while the tab is hidden.
     pub fn enable_background_tick_mode(&self) {
@@ -1444,8 +1453,31 @@ pub fn n7_memoria(i: u32) -> f64 {
         10 => m::LEITURAS_TOTAL_MEMORY.load(Relaxed) as f64,
         11 => m::fator_coleta_por_quadro(),
         12 => m::QUADROS_EXECUTADOS.load(Relaxed) as f64,
+        13 => m::OBJETOS_GC.load(Relaxed) as f64,
+        14 => ruffle_render::memoria::bytes_texturas() as f64,
+        15 => m::memoria_do_jogo().unwrap_or(-1.0),
+        16 => m::LIBERACOES.load(Relaxed) as f64,
+        17 => m::fator_total_memory(),
+        18 => m::HEAP_CLASSE[0].load(Relaxed) as f64,
+        19 => m::HEAP_CLASSE[1].load(Relaxed) as f64,
+        20 => m::HEAP_CLASSE[2].load(Relaxed) as f64,
+        21 => m::BLOCOS_GRANDES.load(Relaxed) as f64,
+        23 => m::BYTEARRAY_BYTES.load(Relaxed) as f64,
+        24..=31 => m::GRANDES_POR_ETIQUETA[(i - 24) as usize].load(Relaxed) as f64,
         _ => -1.0,
     }
+}
+
+/// Multiplicador do que o jogo le em `System.totalMemory` (0 ou negativo so le). O Naruto Legaxy
+/// guarda texturas de luta/janela ate 700 MB; com fator 2 ele solta com 350 MB reais (aparelho com
+/// pouca memoria, ex.: iPhone). Devolve o valor atual.
+#[wasm_bindgen]
+pub fn n7_fator_memoria(valor: f64) -> f64 {
+    use ruffle_core::memoria_n7 as m;
+    if valor > 0.0 {
+        m::definir_fator_total_memory(valor);
+    }
+    m::fator_total_memory()
 }
 
 /// Ajusta a divida de GC por quadro (fracao dos objetos vivos; 0 desliga). Devolve o valor atual.

@@ -250,6 +250,13 @@ pub struct TexturaCompartilhada {
     handle: OnceCell<BitmapHandle>,
 }
 
+impl TexturaCompartilhada {
+    /// Ja foi registrada na GPU (da para desenhar sem os pixels na CPU).
+    pub fn registrada(&self) -> bool {
+        self.handle.get().is_some()
+    }
+}
+
 impl<'gc> BitmapData<'gc> {
     /// `BitmapData` de um simbolo da biblioteca: aponta para os pixels ja decodificados do simbolo
     /// (copy-on-write) e usa a textura da GPU compartilhada enquanto nao houver escrita.
@@ -262,6 +269,20 @@ impl<'gc> BitmapData<'gc> {
         textura: Arc<TexturaCompartilhada>,
     ) -> Self {
         let data = BitmapRawData::new_compartilhado(width, height, transparency, pixels, textura);
+        let data = BitmapRawDataWrapper::new(Gc::new(mc, data.into()));
+
+        Self(data)
+    }
+
+    /// `BitmapData` de um simbolo da biblioteca que decodifica a imagem so no 1o uso dos pixels.
+    pub fn new_preguicoso(
+        mc: &Mutation<'gc>,
+        width: u32,
+        height: u32,
+        transparency: bool,
+        fonte: std::rc::Rc<crate::character::FonteDoSimbolo>,
+    ) -> Self {
+        let data = BitmapRawData::new_preguicoso(width, height, transparency, fonte);
         let data = BitmapRawDataWrapper::new(Gc::new(mc, data.into()));
 
         Self(data)
@@ -420,13 +441,19 @@ impl<'gc> BitmapData<'gc> {
 #[collect(no_drop)]
 pub struct BitmapRawData<'gc> {
     /// The pixels in the bitmap, stored as a array of pre-multiplied ARGB colour values
+    /// Vazio = ainda nao decodificado (simbolo da biblioteca, ver `fonte`): decodifica no 1o
+    /// acesso aos pixels, como o Flash.
     #[collect(require_static)]
-    pixels: Arc<Vec<Color>>,
+    pixels: OnceCell<Arc<Vec<Color>>>,
 
-    /// Enquanto `Some`, os pixels sao os do simbolo (sem escrita) e `bitmap_handle`, se houver,
+    /// Simbolo de onde os pixels vem enquanto nao foram decodificados (decodificacao preguicosa).
+    #[collect(require_static)]
+    fonte: Option<std::rc::Rc<crate::character::FonteDoSimbolo>>,
+
+    /// Enquanto preenchida, os pixels sao os do simbolo (sem escrita) e `bitmap_handle`, se houver,
     /// e a textura compartilhada do simbolo — nunca pode ser alvo de escrita.
     #[collect(require_static)]
-    textura_compartilhada: Option<Arc<TexturaCompartilhada>>,
+    textura_compartilhada: OnceCell<Arc<TexturaCompartilhada>>,
 
     width: u32,
     height: u32,
@@ -540,8 +567,9 @@ mod wrapper {
             BitmapRawDataWrapper(Gc::new(
                 mc,
                 BitmapRawData {
-                    pixels: Arc::new(Vec::new()),
-                    textura_compartilhada: None,
+                    pixels: std::cell::OnceCell::from(Arc::new(Vec::new())),
+                    fonte: None,
+                    textura_compartilhada: std::cell::OnceCell::new(),
                     width: 0,
                     height: 0,
                     transparency: false,
@@ -565,8 +593,9 @@ mod wrapper {
             // with no GPU texture
             let data = self.sync(renderer).borrow();
             BitmapRawData {
-                pixels: Arc::clone(&data.pixels),
-                textura_compartilhada: None,
+                pixels: std::cell::OnceCell::from(Arc::clone(data.px())),
+                fonte: None,
+                textura_compartilhada: std::cell::OnceCell::new(),
                 width: data.width,
                 height: data.height,
                 transparency: data.transparency,
@@ -812,12 +841,14 @@ impl std::fmt::Debug for BitmapRawData<'_> {
 
 impl<'gc> BitmapRawData<'gc> {
     pub fn new(width: u32, height: u32, transparency: bool, fill_color: u32) -> Self {
+        let _etq = crate::memoria_n7::Etiqueta::nova(3);
         Self {
-            textura_compartilhada: None,
-            pixels: Arc::new(vec![
+            textura_compartilhada: OnceCell::new(),
+            fonte: None,
+            pixels: OnceCell::from(Arc::new(vec![
                 Color::bgra_u32(fill_color).to_premultiplied_alpha(transparency);
                 width as usize * height as usize
-            ]),
+            ])),
             width,
             height,
             transparency,
@@ -840,8 +871,9 @@ impl<'gc> BitmapRawData<'gc> {
     ) -> Self {
         Self {
             contador: ContadorBitmap::new(pixels.len() as u64 * 4),
-            pixels: Arc::new(pixels),
-            textura_compartilhada: None,
+            pixels: OnceCell::from(Arc::new(pixels)),
+            fonte: None,
+            textura_compartilhada: OnceCell::new(),
             width,
             height,
             transparency,
@@ -863,15 +895,54 @@ impl<'gc> BitmapRawData<'gc> {
         textura: Arc<TexturaCompartilhada>,
     ) -> Self {
         let mut data = Self::new_with_pixels(width, height, transparency, Vec::new());
-        data.pixels = pixels;
-        data.textura_compartilhada = Some(textura);
+        data.pixels = OnceCell::from(pixels);
+        data.textura_compartilhada = OnceCell::from(textura);
         data
+    }
+
+    /// `BitmapData` de um simbolo da biblioteca que so decodifica a imagem quando os pixels forem
+    /// usados (ou desenha direto com a textura que outra instancia viva ja registrou).
+    pub fn new_preguicoso(
+        width: u32,
+        height: u32,
+        transparency: bool,
+        fonte: std::rc::Rc<crate::character::FonteDoSimbolo>,
+    ) -> Self {
+        let mut data = Self::new_with_pixels(width, height, transparency, Vec::new());
+        data.pixels = OnceCell::new();
+        data.fonte = Some(fonte);
+        data
+    }
+
+    /// Pixels (decodifica o simbolo no 1o acesso; nesse caso tambem liga a textura compartilhada).
+    #[inline]
+    fn px(&self) -> &Arc<Vec<Color>> {
+        self.pixels.get_or_init(|| {
+            let Some(fonte) = &self.fonte else {
+                return Arc::new(Vec::new());
+            };
+            match fonte.pixels_compartilhados() {
+                Ok(d) if d.width == self.width && d.height == self.height => {
+                    let _ = self.textura_compartilhada.set(d.textura);
+                    d.pixels
+                }
+                _ => {
+                    tracing::error!("Falha ao decodificar simbolo de bitmap (preguicoso)");
+                    Arc::new(vec![
+                        Color::rgba(0, 0, 0, 0);
+                        self.width as usize * self.height as usize
+                    ])
+                }
+            }
+        })
     }
 
     /// Deixa de usar a textura compartilhada do simbolo (antes de qualquer escrita na GPU ou
     /// na CPU): a proxima `bitmap_handle` cria uma textura propria.
     #[inline]
     pub(crate) fn desligar_textura_compartilhada(&mut self) {
+        // decodifica antes: a decodificacao religaria a textura compartilhada depois
+        self.px();
         if self.textura_compartilhada.take().is_some() {
             self.bitmap_handle = None;
         }
@@ -880,11 +951,14 @@ impl<'gc> BitmapRawData<'gc> {
     /// Acesso de escrita aos pixels: copia-na-escrita se estiverem compartilhados.
     #[inline]
     fn pixels_mut(&mut self) -> &mut Vec<Color> {
+        let _etq = crate::memoria_n7::Etiqueta::nova(3);
         self.desligar_textura_compartilhada();
-        if Arc::strong_count(&self.pixels) != 1 || Arc::weak_count(&self.pixels) != 0 {
-            self.contador.definir(self.pixels.len() as u64 * 4);
+        let p = self.px();
+        if Arc::strong_count(p) != 1 || Arc::weak_count(p) != 0 {
+            let n = p.len() as u64 * 4;
+            self.contador.definir(n);
         }
-        Arc::make_mut(&mut self.pixels)
+        Arc::make_mut(self.pixels.get_mut().expect("pixels decodificados"))
     }
 
     /// `BitmapHandle` para ESCREVER na GPU (draw, filtros, shaders): nunca a textura compartilhada.
@@ -900,8 +974,9 @@ impl<'gc> BitmapRawData<'gc> {
     pub fn dispose(&mut self) {
         self.width = 0;
         self.height = 0;
-        self.textura_compartilhada = None;
-        self.pixels = Arc::new(Vec::new()); // free the CPU pixel buffer
+        self.textura_compartilhada = OnceCell::new();
+        self.fonte = None;
+        self.pixels = OnceCell::from(Arc::new(Vec::new())); // free the CPU pixel buffer
         self.contador.dispose();
         self.bitmap_handle = None;
         // There's no longer a handle to update
@@ -917,7 +992,17 @@ impl<'gc> BitmapRawData<'gc> {
             return Ok(handle.clone());
         }
 
-        if let Some(textura) = &self.textura_compartilhada {
+        // simbolo ainda nao decodificado: se outra instancia viva ja registrou a textura do
+        // simbolo na GPU, desenha com ela sem decodificar; senao decodifica agora
+        if self.pixels.get().is_none() {
+            if let Some(t) = self.fonte.as_ref().and_then(|f| f.textura_registrada()) {
+                let _ = self.textura_compartilhada.set(t);
+            } else {
+                self.px();
+            }
+        }
+
+        if let Some(textura) = self.textura_compartilhada.get() {
             if let Some(handle) = textura.handle.get() {
                 self.dirty_state = DirtyState::Clean;
                 self.bitmap_handle = Some(handle.clone());
@@ -1001,11 +1086,11 @@ impl<'gc> BitmapRawData<'gc> {
     }
 
     pub fn pixels(&self) -> &[Color] {
-        &self.pixels
+        self.px()
     }
 
     pub fn pixels_rgba(&self) -> &[u8] {
-        Color::slice_as_rgba(&self.pixels)
+        Color::slice_as_rgba(self.px())
     }
 
     pub fn width(&self) -> u32 {
@@ -1044,7 +1129,7 @@ impl<'gc> BitmapRawData<'gc> {
 
     #[inline]
     pub fn get_pixel32_raw(&self, x: u32, y: u32) -> Color {
-        self.pixels[(x + y * self.width()) as usize]
+        self.px()[(x + y * self.width()) as usize]
     }
 
     pub fn raw_pixels_mut(&mut self) -> &mut Vec<Color> {
@@ -1052,7 +1137,7 @@ impl<'gc> BitmapRawData<'gc> {
     }
 
     pub fn raw_pixels(&self) -> &[Color] {
-        &self.pixels
+        self.px()
     }
 
     // Updates the data stored with our `BitmapHandle` if this `BitmapRawData`

@@ -2055,6 +2055,7 @@ impl Player {
 
     #[instrument(level = "debug", skip_all)]
     pub fn run_frame(&mut self) {
+        let _etq = crate::memoria_n7::Etiqueta::nova(6);
         crate::memoria_n7::contar(&crate::memoria_n7::QUADROS_EXECUTADOS);
         crate::memoria_n7::passar_quadro_pressao();
         // Coleta continua (Naruto Legaxy): o gc-arena so comeca um ciclo novo depois de muitas
@@ -2108,6 +2109,7 @@ impl Player {
 
     #[instrument(level = "debug", skip_all)]
     pub fn render(&mut self) {
+        let _etq = crate::memoria_n7::Etiqueta::nova(5);
         let invalidated = self.enter_arena(|_, gc_root, _| gc_root.stage.invalidated());
 
         if invalidated {

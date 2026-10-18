@@ -1,4 +1,5 @@
 pub mod bitmap_data;
+pub mod jpeg_n7;
 pub mod operations;
 pub mod turbulence;
 

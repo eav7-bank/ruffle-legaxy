@@ -4815,6 +4815,8 @@ dependencies = [
  "url",
  "wasm-bindgen-futures",
  "web-time",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]

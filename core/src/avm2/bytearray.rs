@@ -53,7 +53,7 @@ pub enum ObjectEncoding {
     Amf3 = 3,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ByteArrayStorage {
     /// Underlying ByteArray
     bytes: Vec<u8>,
@@ -66,6 +66,29 @@ pub struct ByteArrayStorage {
 
     /// The encoding used when serializing/deserializing using readObject/writeObject
     object_encoding: ObjectEncoding,
+
+    /// Naruto Legaxy: capacidade ja somada em `memoria_n7::BYTEARRAY_BYTES`.
+    contado: usize,
+}
+
+impl Clone for ByteArrayStorage {
+    fn clone(&self) -> Self {
+        let mut b = ByteArrayStorage {
+            bytes: self.bytes.clone(),
+            position: self.position.clone(),
+            endian: self.endian,
+            object_encoding: self.object_encoding,
+            contado: 0,
+        };
+        b.recontar();
+        b
+    }
+}
+
+impl Drop for ByteArrayStorage {
+    fn drop(&mut self) {
+        crate::memoria_n7::ajustar_bytearray(self.contado, 0);
+    }
 }
 
 impl ByteArrayStorage {
@@ -76,17 +99,21 @@ impl ByteArrayStorage {
             position: Cell::new(0),
             endian: Endian::Big,
             object_encoding: context.avm2.default_bytearray_encoding,
+            contado: 0,
         }
     }
 
     /// Create a new ByteArrayStorage using an already existing vector
     pub fn from_vec(context: &mut UpdateContext<'_>, bytes: Vec<u8>) -> ByteArrayStorage {
-        ByteArrayStorage {
+        let mut b = ByteArrayStorage {
             bytes,
             position: Cell::new(0),
             endian: Endian::Big,
             object_encoding: context.avm2.default_bytearray_encoding,
-        }
+            contado: 0,
+        };
+        b.recontar();
+        b
     }
 
     /// Write bytes at the next position in the ByteArray, growing if needed.
@@ -274,6 +301,16 @@ impl ByteArrayStorage {
         }
     }
 
+    /// Atualiza a contagem global de bytes de ByteArray (capacidade do buffer).
+    #[inline]
+    fn recontar(&mut self) {
+        let cap = self.bytes.capacity();
+        if cap != self.contado {
+            crate::memoria_n7::ajustar_bytearray(self.contado, cap);
+            self.contado = cap;
+        }
+    }
+
     #[inline]
     pub fn clear(&mut self) {
         self.bytes.clear();
@@ -282,13 +319,15 @@ impl ByteArrayStorage {
 
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.bytes.shrink_to_fit()
+        self.bytes.shrink_to_fit();
+        self.recontar();
     }
 
     #[inline]
     pub fn set_length(&mut self, new_len: usize) {
         self.bytes.resize(new_len, 0);
         self.position.set(self.position().min(new_len));
+        self.recontar();
     }
 
     pub fn get(&self, pos: usize) -> Option<u8> {
@@ -297,7 +336,8 @@ impl ByteArrayStorage {
 
     pub fn set(&mut self, item: usize, value: u8) {
         if self.len() < (item + 1) {
-            self.bytes.resize(item + 1, 0)
+            self.bytes.resize(item + 1, 0);
+            self.recontar();
         }
 
         *self.bytes.get_mut(item).unwrap() = value;
@@ -308,6 +348,7 @@ impl ByteArrayStorage {
     pub fn swap_storage_with(&mut self, new_data: &mut Vec<u8>) {
         self.position.set(0);
         std::mem::swap(&mut self.bytes, new_data);
+        self.recontar();
     }
 
     /// Write a single byte at any offset in the bytearray, panicking if out of bounds.

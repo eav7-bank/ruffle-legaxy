@@ -1704,6 +1704,7 @@ impl<'gc> MovieLoader<'gc> {
 
         let movie = match sniffed_type {
             ContentType::Swf => {
+                let _etq = crate::memoria_n7::Etiqueta::nova(2);
                 let mut movie = SwfMovieData::from_data(
                     data,
                     url.clone(),
@@ -1871,16 +1872,24 @@ impl<'gc> MovieLoader<'gc> {
 
                 // This will construct AVM2-side objects even under AVM1, but it doesn't matter,
                 // since Bitmap and BitmapData never have AVM1-side objects.
-                let bitmap = ruffle_render::utils::decode_define_bits_jpeg(data, None)?;
-
-                let transparency = bitmap.format().supports_transparency();
-                let bitmapdata = BitmapData::new_with_pixels(
-                    activation.gc(),
-                    bitmap.width(),
-                    bitmap.height(),
-                    transparency,
-                    bitmap.as_colors().map(Color::from).collect(),
-                );
+                let _etq = crate::memoria_n7::Etiqueta::nova(1);
+                // JPEG comum: direto no buffer final (sem RGB intermediario); resto: caminho normal
+                let bitmapdata = match crate::bitmap::jpeg_n7::decodificar_direto(data) {
+                    Some((w, h, pixels)) => {
+                        BitmapData::new_with_pixels(activation.gc(), w, h, false, pixels)
+                    }
+                    None => {
+                        let bitmap = ruffle_render::utils::decode_define_bits_jpeg(data, None)?;
+                        let transparency = bitmap.format().supports_transparency();
+                        BitmapData::new_with_pixels(
+                            activation.gc(),
+                            bitmap.width(),
+                            bitmap.height(),
+                            transparency,
+                            bitmap.as_colors().map(Color::from).collect(),
+                        )
+                    }
+                };
 
                 let bitmapdata_avm2 =
                     BitmapDataObject::from_bitmap_data(activation.context, bitmapdata);

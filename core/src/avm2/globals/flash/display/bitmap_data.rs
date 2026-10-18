@@ -145,6 +145,9 @@ pub fn init<'gc>(
 
     new_bitmap_data.init_object2(activation.gc(), bitmap_data_obj);
     bitmap_data_obj.init_bitmap_data(activation.gc(), new_bitmap_data);
+    if !matches!(character, Some(Character::Bitmap(_))) {
+        activation.context.library.vigiar_bitmap(new_bitmap_data);
+    }
 
     Ok(Value::Undefined)
 }

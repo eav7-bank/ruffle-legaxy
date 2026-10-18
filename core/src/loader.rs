@@ -1891,6 +1891,7 @@ impl<'gc> MovieLoader<'gc> {
                     }
                 };
 
+                activation.context.library.vigiar_bitmap(bitmapdata);
                 let bitmapdata_avm2 =
                     BitmapDataObject::from_bitmap_data(activation.context, bitmapdata);
 

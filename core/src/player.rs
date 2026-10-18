@@ -2102,6 +2102,9 @@ impl Player {
             for cb in std::mem::take(context.post_frame_callbacks) {
                 (cb.callback)(context, cb.data);
             }
+
+            // Naruto Legaxy: compacta imagens paradas (como o "purge" do Flash 10.1)
+            context.library.compactar_bitmaps_parados(context.gc_context);
         });
 
         self.needs_render = true;

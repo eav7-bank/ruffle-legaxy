@@ -419,6 +419,15 @@ impl<'gc> BitmapData<'gc> {
         self.0.render(smoothing, context, pixel_snapping);
     }
 
+    /// Referencia fraca (lista de vigia da compactacao de imagens paradas).
+    pub fn fraco(&self) -> gc_arena::GcWeak<'gc, gc_arena::lock::RefLock<BitmapRawData<'gc>>> {
+        self.0.fraco()
+    }
+
+    pub fn bytes_pixels(&self) -> usize {
+        self.width() as usize * self.height() as usize * 4
+    }
+
     pub fn can_read(&self, read_area: PixelRegion) -> bool {
         self.0.can_read(read_area)
     }
@@ -449,6 +458,19 @@ pub struct BitmapRawData<'gc> {
     /// Simbolo de onde os pixels vem enquanto nao foram decodificados (decodificacao preguicosa).
     #[collect(require_static)]
     fonte: Option<std::rc::Rc<crate::character::FonteDoSimbolo>>,
+
+    /// Pixels compactados (deflate) de uma imagem parada; `pixels` fica vazio e o 1o acesso
+    /// descompacta (ver `memoria_n7`, compactacao de imagens paradas).
+    #[collect(require_static)]
+    compactado: std::cell::RefCell<Option<Vec<u8>>>,
+
+    /// Quadro do ultimo acesso da CPU aos pixels.
+    #[collect(require_static)]
+    ultimo_acesso: std::cell::Cell<u64>,
+
+    /// Ja tentou compactar e nao valeu a pena (nao tenta de novo ate a proxima escrita).
+    #[collect(require_static)]
+    nao_compacta: std::cell::Cell<bool>,
 
     /// Enquanto preenchida, os pixels sao os do simbolo (sem escrita) e `bitmap_handle`, se houver,
     /// e a textura compartilhada do simbolo — nunca pode ser alvo de escrita.
@@ -569,6 +591,9 @@ mod wrapper {
                 BitmapRawData {
                     pixels: std::cell::OnceCell::from(Arc::new(Vec::new())),
                     fonte: None,
+                    compactado: Default::default(),
+                    ultimo_acesso: Default::default(),
+                    nao_compacta: Default::default(),
                     textura_compartilhada: std::cell::OnceCell::new(),
                     width: 0,
                     height: 0,
@@ -595,6 +620,9 @@ mod wrapper {
             BitmapRawData {
                 pixels: std::cell::OnceCell::from(Arc::clone(data.px())),
                 fonte: None,
+                compactado: Default::default(),
+                ultimo_acesso: Default::default(),
+                nao_compacta: Default::default(),
                 textura_compartilhada: std::cell::OnceCell::new(),
                 width: data.width,
                 height: data.height,
@@ -766,6 +794,11 @@ mod wrapper {
             self.0.borrow_mut(mc).display_objects.push(callback);
         }
 
+        /// Referencia fraca (lista de vigia da compactacao de imagens paradas).
+        pub fn fraco(&self) -> gc_arena::GcWeak<'gc, gc_arena::lock::RefLock<BitmapRawData<'gc>>> {
+            Gc::downgrade(self.0)
+        }
+
         pub fn render(
             &self,
             smoothing: bool,
@@ -845,6 +878,9 @@ impl<'gc> BitmapRawData<'gc> {
         Self {
             textura_compartilhada: OnceCell::new(),
             fonte: None,
+            compactado: Default::default(),
+            ultimo_acesso: std::cell::Cell::new(crate::memoria_n7::quadro_atual()),
+            nao_compacta: Default::default(),
             pixels: OnceCell::from(Arc::new(vec![
                 Color::bgra_u32(fill_color).to_premultiplied_alpha(transparency);
                 width as usize * height as usize
@@ -873,6 +909,9 @@ impl<'gc> BitmapRawData<'gc> {
             contador: ContadorBitmap::new(pixels.len() as u64 * 4),
             pixels: OnceCell::from(Arc::new(pixels)),
             fonte: None,
+            compactado: Default::default(),
+            ultimo_acesso: std::cell::Cell::new(crate::memoria_n7::quadro_atual()),
+            nao_compacta: Default::default(),
             textura_compartilhada: OnceCell::new(),
             width,
             height,
@@ -917,7 +956,11 @@ impl<'gc> BitmapRawData<'gc> {
     /// Pixels (decodifica o simbolo no 1o acesso; nesse caso tambem liga a textura compartilhada).
     #[inline]
     fn px(&self) -> &Arc<Vec<Color>> {
+        self.ultimo_acesso.set(crate::memoria_n7::quadro_atual());
         self.pixels.get_or_init(|| {
+            if let Some(c) = self.compactado.borrow_mut().take() {
+                return Arc::new(self.descompactar(&c));
+            }
             let Some(fonte) = &self.fonte else {
                 return Arc::new(Vec::new());
             };
@@ -937,6 +980,75 @@ impl<'gc> BitmapRawData<'gc> {
         })
     }
 
+    fn descompactar(&self, c: &[u8]) -> Vec<Color> {
+        use std::io::Read;
+        let n = self.width as usize * self.height as usize;
+        let mut pixels = vec![Color::default(); n];
+        // SAFETY: `Color` e `#[repr(C, align(4))]` com 4 campos `u8`; qualquer padrao de bits e
+        // valido e a fatia cobre exatamente os `n * 4` bytes do `Vec`.
+        let bytes =
+            unsafe { std::slice::from_raw_parts_mut(pixels.as_mut_ptr().cast::<u8>(), n * 4) };
+        if flate2::read::DeflateDecoder::new(c).read_exact(bytes).is_err() {
+            tracing::error!("Falha ao descompactar imagem parada {}x{}", self.width, self.height);
+        }
+        crate::memoria_n7::contar(&crate::memoria_n7::DESCOMPACTADAS);
+        self.contador.definir(n as u64 * 4);
+        pixels
+    }
+
+    /// Compactacao de imagem parada (como o "purge" do Flash 10.1). So vale se a imagem ja esta
+    /// na GPU (ou nem precisa estar: o desenho descompacta se faltar a textura), sem escrita
+    /// pendente e sem acesso da CPU ha `QUADROS_OCIOSA` quadros. Devolve os bytes de pixels
+    /// examinados (orcamento de CPU do quadro).
+    pub(crate) fn compactar_se_parada(&mut self, quadro: u64) -> usize {
+        use crate::memoria_n7 as m;
+        if self.disposed || self.nao_compacta.get() || !matches!(self.dirty_state, DirtyState::Clean)
+        {
+            return 0;
+        }
+        if quadro.saturating_sub(self.ultimo_acesso.get()) < m::QUADROS_OCIOSA {
+            return 0;
+        }
+        let Some(p) = self.pixels.get() else {
+            return 0;
+        };
+        let bytes = p.len() * 4;
+        if bytes < m::MINIMO_COMPACTAR {
+            return 0;
+        }
+        // simbolo sem escrita: os pixels sao os do simbolo, decodificados de novo se precisar
+        if self.fonte.is_some() && self.textura_compartilhada.get().is_some() {
+            self.pixels = OnceCell::new();
+            m::contar(&m::SIMBOLOS_SOLTOS);
+            return 0;
+        }
+        if Arc::strong_count(p) != 1 || Arc::weak_count(p) != 0 {
+            return 0;
+        }
+        let mut enc =
+            flate2::write::DeflateEncoder::new(Vec::with_capacity(bytes / 8), flate2::Compression::fast());
+        if std::io::Write::write_all(&mut enc, Color::slice_as_rgba(p)).is_err() {
+            return bytes;
+        }
+        let Ok(c) = enc.finish() else {
+            return bytes;
+        };
+        if c.len() * 2 > bytes {
+            // compacta pouco (foto, ruido): deixa como esta
+            self.nao_compacta.set(true);
+            return bytes;
+        }
+        m::contar(&m::COMPACTADAS);
+        m::COMPACTADAS_ANTES.fetch_add(bytes as u64, std::sync::atomic::Ordering::Relaxed);
+        m::COMPACTADAS_DEPOIS.fetch_add(c.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        self.contador.definir(c.len() as u64);
+        let mut c = c;
+        c.shrink_to_fit();
+        *self.compactado.borrow_mut() = Some(c);
+        self.pixels = OnceCell::new();
+        bytes
+    }
+
     /// Deixa de usar a textura compartilhada do simbolo (antes de qualquer escrita na GPU ou
     /// na CPU): a proxima `bitmap_handle` cria uma textura propria.
     #[inline]
@@ -953,6 +1065,7 @@ impl<'gc> BitmapRawData<'gc> {
     fn pixels_mut(&mut self) -> &mut Vec<Color> {
         let _etq = crate::memoria_n7::Etiqueta::nova(3);
         self.desligar_textura_compartilhada();
+        self.nao_compacta.set(false);
         let p = self.px();
         if Arc::strong_count(p) != 1 || Arc::weak_count(p) != 0 {
             let n = p.len() as u64 * 4;
@@ -976,6 +1089,7 @@ impl<'gc> BitmapRawData<'gc> {
         self.height = 0;
         self.textura_compartilhada = OnceCell::new();
         self.fonte = None;
+        self.compactado = Default::default();
         self.pixels = OnceCell::from(Arc::new(Vec::new())); // free the CPU pixel buffer
         self.contador.dispose();
         self.bitmap_handle = None;

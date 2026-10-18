@@ -1464,8 +1464,31 @@ pub fn n7_memoria(i: u32) -> f64 {
         21 => m::BLOCOS_GRANDES.load(Relaxed) as f64,
         23 => m::BYTEARRAY_BYTES.load(Relaxed) as f64,
         24..=31 => m::GRANDES_POR_ETIQUETA[(i - 24) as usize].load(Relaxed) as f64,
+        32..=34 => m::BMP_CLASSE[(i - 32) as usize].load(Relaxed) as f64,
+        35 => m::BMP_ENORMES.load(Relaxed) as f64,
+        36 => m::COMPACTADAS.load(Relaxed) as f64,
+        37 => m::COMPACTADAS_ANTES.load(Relaxed) as f64,
+        38 => m::COMPACTADAS_DEPOIS.load(Relaxed) as f64,
+        39 => m::DESCOMPACTADAS.load(Relaxed) as f64,
+        40 => m::SIMBOLOS_SOLTOS.load(Relaxed) as f64,
+        41 => m::VIGIADAS.load(Relaxed) as f64,
         _ => -1.0,
     }
+}
+
+/// Diagnostico: blocos vivos no balde `i` (tamanho i*16..i*16+15 bytes; 256 = 4 KiB ou mais).
+#[wasm_bindgen]
+pub fn n7_histograma(i: u32) -> f64 {
+    ruffle_core::memoria_n7::HISTOGRAMA
+        .get(i as usize)
+        .map(|c| c.load(std::sync::atomic::Ordering::Relaxed) as f64)
+        .unwrap_or(-1.0)
+}
+
+/// Diagnostico: tamanho (bytes) de tipos do Ruffle, para ler o histograma.
+#[wasm_bindgen]
+pub fn n7_tamanhos() -> String {
+    ruffle_core::memoria_n7::tamanhos_n7()
 }
 
 /// Multiplicador do que o jogo le em `System.totalMemory` (0 ou negativo so le). O Naruto Legaxy

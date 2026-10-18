@@ -437,6 +437,12 @@ pub struct Library<'gc> {
     /// A list of the symbols associated with specific AVM2 constructor
     /// prototypes.
     avm2_class_registry: Avm2ClassRegistry<'gc>,
+
+    /// Naruto Legaxy: imagens com pixels proprios vigiadas pela compactacao de imagens paradas
+    /// (`memoria_n7`). Referencias fracas: nao seguram a imagem viva.
+    bitmaps_vigiados: Vec<gc_arena::GcWeak<'gc, gc_arena::lock::RefLock<crate::bitmap::bitmap_data::BitmapRawData<'gc>>>>,
+    #[collect(require_static)]
+    cursor_vigia: usize,
 }
 
 impl<'gc> Library<'gc> {
@@ -450,7 +456,50 @@ impl<'gc> Library<'gc> {
             default_font_names: Default::default(),
             default_font_cache: Default::default(),
             avm2_class_registry: Default::default(),
+            bitmaps_vigiados: Vec::new(),
+            cursor_vigia: 0,
         }
+    }
+
+    /// Passa a vigiar uma imagem com pixels proprios (compactacao quando ficar parada).
+    pub fn vigiar_bitmap(&mut self, bitmap: crate::bitmap::bitmap_data::BitmapData<'gc>) {
+        if bitmap.bytes_pixels() >= crate::memoria_n7::MINIMO_COMPACTAR {
+            self.bitmaps_vigiados.push(bitmap.fraco());
+            crate::memoria_n7::VIGIADAS.store(self.bitmaps_vigiados.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Um passo da compactacao de imagens paradas (chamado a cada quadro, com orcamento de CPU).
+    pub fn compactar_bitmaps_parados(&mut self, mc: &gc_arena::Mutation<'gc>) {
+        use crate::memoria_n7 as m;
+        let quadro = m::quadro_atual();
+        let mut gasto = 0usize;
+        let mut vistos = 0usize;
+        let total = self.bitmaps_vigiados.len();
+        while gasto < m::ORCAMENTO_COMPACTAR && vistos < total.min(256) && !self.bitmaps_vigiados.is_empty() {
+            vistos += 1;
+            if self.cursor_vigia >= self.bitmaps_vigiados.len() {
+                self.cursor_vigia = 0;
+            }
+            let i = self.cursor_vigia;
+            match self.bitmaps_vigiados[i].upgrade(mc) {
+                None => {
+                    self.bitmaps_vigiados.swap_remove(i);
+                }
+                Some(b) => {
+                    if let Ok(mut dados) = b.try_borrow_mut(mc) {
+                        if dados.disposed() {
+                            drop(dados);
+                            self.bitmaps_vigiados.swap_remove(i);
+                            continue;
+                        }
+                        gasto += dados.compactar_se_parada(quadro);
+                    }
+                    self.cursor_vigia += 1;
+                }
+            }
+        }
+        m::VIGIADAS.store(self.bitmaps_vigiados.len() as u64, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn library_for_movie(&self, movie: SwfMovie<'gc>) -> Option<&MovieLibrary<'gc>> {

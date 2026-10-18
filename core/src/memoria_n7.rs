@@ -44,8 +44,17 @@ fn classe(n: usize) -> usize {
     }
 }
 
+/// Blocos vivos por tamanho (de 16 em 16 bytes ate 4 KiB; o ultimo junta o resto).
+pub static HISTOGRAMA: [AtomicUsize; 257] = [const { AtomicUsize::new(0) }; 257];
+
+#[inline]
+fn balde(n: usize) -> usize {
+    (n / 16).min(256)
+}
+
 #[inline]
 pub fn somar_heap(n: usize) {
+    HISTOGRAMA[balde(n)].fetch_add(1, Ordering::Relaxed);
     let c = classe(n);
     HEAP_CLASSE[c].fetch_add(n, Ordering::Relaxed);
     if c == 2 {
@@ -59,6 +68,7 @@ pub fn somar_heap(n: usize) {
 
 #[inline]
 pub fn subtrair_heap(n: usize) {
+    HISTOGRAMA[balde(n)].fetch_sub(1, Ordering::Relaxed);
     let c = classe(n);
     HEAP_CLASSE[c].fetch_sub(n, Ordering::Relaxed);
     if c == 2 {
@@ -79,24 +89,60 @@ pub fn contar(c: &AtomicU64) {
 
 /// Acompanha um `BitmapRawData`: conta vivos e bytes de pixels proprios.
 #[derive(Debug)]
-pub struct ContadorBitmap(u64);
+pub struct ContadorBitmap(std::cell::Cell<u64>);
+
+/// Bytes de pixels proprios por tamanho de imagem: [< 1 MiB, 1..16 MiB, >= 16 MiB] e quantas
+/// imagens >= 16 MiB (tiras de animacao) estao vivas.
+pub static BMP_CLASSE: [AtomicU64; 3] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
+pub static BMP_ENORMES: AtomicU64 = AtomicU64::new(0);
+
+fn bmp_classe(bytes: u64) -> usize {
+    if bytes < 1024 * 1024 {
+        0
+    } else if bytes < 16 * 1024 * 1024 {
+        1
+    } else {
+        2
+    }
+}
+
+fn bmp_somar(bytes: u64) {
+    let c = bmp_classe(bytes);
+    BMP_CLASSE[c].fetch_add(bytes, Ordering::Relaxed);
+    if c == 2 {
+        BMP_ENORMES.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+fn bmp_subtrair(bytes: u64) {
+    let c = bmp_classe(bytes);
+    BMP_CLASSE[c].fetch_sub(bytes, Ordering::Relaxed);
+    if c == 2 {
+        BMP_ENORMES.fetch_sub(1, Ordering::Relaxed);
+    }
+}
 
 impl ContadorBitmap {
     pub fn new(bytes: u64) -> Self {
         BMP_VIVOS.fetch_add(1, Ordering::Relaxed);
         BMP_CRIADOS.fetch_add(1, Ordering::Relaxed);
         BMP_BYTES.fetch_add(bytes, Ordering::Relaxed);
-        Self(bytes)
+        bmp_somar(bytes);
+        Self(std::cell::Cell::new(bytes))
     }
 
-    /// Troca os bytes proprios (ex.: pixels compartilhados passaram a ser proprios).
-    pub fn definir(&mut self, bytes: u64) {
-        BMP_BYTES.fetch_sub(self.0, Ordering::Relaxed);
+    /// Troca os bytes proprios (ex.: pixels compartilhados passaram a ser proprios, ou foram
+    /// compactados / descompactados).
+    pub fn definir(&self, bytes: u64) {
+        let antes = self.0.get();
+        BMP_BYTES.fetch_sub(antes, Ordering::Relaxed);
         BMP_BYTES.fetch_add(bytes, Ordering::Relaxed);
-        self.0 = bytes;
+        bmp_subtrair(antes);
+        bmp_somar(bytes);
+        self.0.set(bytes);
     }
 
-    pub fn dispose(&mut self) {
+    pub fn dispose(&self) {
         BMP_DISPOSE.fetch_add(1, Ordering::Relaxed);
         self.definir(0);
     }
@@ -105,7 +151,8 @@ impl ContadorBitmap {
 impl Drop for ContadorBitmap {
     fn drop(&mut self) {
         BMP_VIVOS.fetch_sub(1, Ordering::Relaxed);
-        BMP_BYTES.fetch_sub(self.0, Ordering::Relaxed);
+        BMP_BYTES.fetch_sub(self.0.get(), Ordering::Relaxed);
+        bmp_subtrair(self.0.get());
     }
 }
 
@@ -314,3 +361,42 @@ fn grande_liberado(p: usize) {
     TRAVA_GRANDES.store(false, Ordering::Release);
 }
 
+
+/// Diagnostico: tamanhos de tipos centrais do AVM2 (para ler o histograma de blocos).
+pub fn tamanhos_n7() -> String {
+    use std::mem::size_of;
+    format!(
+        "ScriptObjectData={} Value={} Object={} usize={}",
+        size_of::<crate::avm2::object::ScriptObjectData<'static>>(),
+        size_of::<crate::avm2::Value<'static>>(),
+        size_of::<crate::avm2::Object<'static>>(),
+        size_of::<usize>(),
+    )
+}
+
+// ===== Compactacao de imagens paradas (Naruto Legaxy, como o "purge" do Flash 10.1) =====
+// Imagem com pixels proprios que ficou parada (sem acesso da CPU) por `QUADROS_OCIOSA` quadros
+// tem os pixels compactados (deflate rapido); quem desenha usa a textura que ja esta na GPU.
+// O 1o acesso aos pixels descompacta sem o jogo perceber. Imagem de simbolo sem escrita so
+// solta os pixels (sao decodificados de novo da origem).
+
+/// Quadros sem acesso da CPU para uma imagem ser compactada (~4 s a 30 fps).
+pub const QUADROS_OCIOSA: u64 = 120;
+/// Tamanho minimo (bytes de pixels) para valer a pena.
+pub const MINIMO_COMPACTAR: usize = 64 * 1024;
+/// Bytes de pixels examinados para compactar por quadro (limite de tempo de CPU).
+pub const ORCAMENTO_COMPACTAR: usize = 2 * 1024 * 1024;
+
+/// Imagens compactadas, bytes de pixels antes e depois, descompactacoes e simbolos soltos.
+pub static COMPACTADAS: AtomicU64 = AtomicU64::new(0);
+pub static COMPACTADAS_ANTES: AtomicU64 = AtomicU64::new(0);
+pub static COMPACTADAS_DEPOIS: AtomicU64 = AtomicU64::new(0);
+pub static DESCOMPACTADAS: AtomicU64 = AtomicU64::new(0);
+pub static SIMBOLOS_SOLTOS: AtomicU64 = AtomicU64::new(0);
+/// Imagens na lista de vigia.
+pub static VIGIADAS: AtomicU64 = AtomicU64::new(0);
+
+#[inline]
+pub fn quadro_atual() -> u64 {
+    QUADROS_EXECUTADOS.load(Ordering::Relaxed)
+}

@@ -1039,6 +1039,34 @@ impl<'gc> BitmapRawData<'gc> {
     /// na GPU (ou nem precisa estar: o desenho descompacta se faltar a textura), sem escrita
     /// pendente e sem acesso da CPU ha `QUADROS_OCIOSA` quadros. Devolve os bytes de pixels
     /// examinados (orcamento de CPU do quadro).
+    /// Situacao da imagem para o censo (ver memoria_n7::CENSO) e bytes de pixels na CPU.
+    pub(crate) fn motivo_censo(&self, quadro: u64) -> (usize, u64) {
+        use crate::memoria_n7 as m;
+        let bytes = self.pixels.get().map(|p| p.len() as u64 * 4).unwrap_or(0);
+        if self.disposed || self.nao_compacta.get() {
+            return (0, bytes);
+        }
+        if !matches!(self.dirty_state, DirtyState::Clean) {
+            return (1, bytes);
+        }
+        if quadro.saturating_sub(self.ultimo_acesso.get()) < m::quadros_ociosa() {
+            return (2, bytes);
+        }
+        let Some(p) = self.pixels.get() else {
+            return (3, 0);
+        };
+        if bytes < m::MINIMO_COMPACTAR as u64 {
+            return (4, bytes);
+        }
+        if self.fonte.is_some() && self.textura_compartilhada.get().is_some() {
+            return (6, bytes);
+        }
+        if Arc::strong_count(p) != 1 || Arc::weak_count(p) != 0 {
+            return (5, bytes);
+        }
+        (7, bytes)
+    }
+
     pub(crate) fn compactar_se_parada(&mut self, quadro: u64) -> usize {
         use crate::memoria_n7 as m;
         if self.disposed || self.nao_compacta.get() || !matches!(self.dirty_state, DirtyState::Clean)

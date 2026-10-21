@@ -441,6 +441,13 @@ pub fn quadros_ociosa() -> u64 {
 pub fn orcamento_compactar() -> usize {
     ORCAMENTO_COMPACTAR_CFG.load(Ordering::Relaxed) as usize
 }
+/// Censo das imagens vigiadas (a cada 60 quadros): quantas e quantos bytes de pixels em cada situacao
+/// — 0 descartada/nao compacta, 1 escrita pendente (CpuModified/GpuModified), 2 acessada ha pouco,
+/// 3 sem pixels na CPU (ja compactada ou preguicosa), 4 pequena, 5 pixels compartilhados (clone),
+/// 6 simbolo sem escrita, 7 compactavel agora.
+pub static CENSO: [AtomicU64; 8] = [const { AtomicU64::new(0) }; 8];
+pub static CENSO_BYTES: [AtomicU64; 8] = [const { AtomicU64::new(0) }; 8];
+
 /// Ajusta a compactacao (0 ou negativo mantem). Devolve (quadros, orcamento em bytes).
 pub fn definir_compactacao(quadros: f64, orcamento: f64) -> (u64, u64) {
     if quadros >= 1.0 {

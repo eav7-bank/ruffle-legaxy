@@ -473,6 +473,23 @@ impl<'gc> Library<'gc> {
     pub fn compactar_bitmaps_parados(&mut self, mc: &gc_arena::Mutation<'gc>) {
         use crate::memoria_n7 as m;
         let quadro = m::quadro_atual();
+        if quadro % 60 == 0 {
+            let mut n = [0u64; 8];
+            let mut b = [0u64; 8];
+            for fraco in &self.bitmaps_vigiados {
+                if let Some(bd) = fraco.upgrade(mc)
+                    && let Ok(dados) = bd.try_borrow()
+                {
+                    let (k, bytes) = dados.motivo_censo(quadro);
+                    n[k] += 1;
+                    b[k] += bytes;
+                }
+            }
+            for k in 0..8 {
+                m::CENSO[k].store(n[k], std::sync::atomic::Ordering::Relaxed);
+                m::CENSO_BYTES[k].store(b[k], std::sync::atomic::Ordering::Relaxed);
+            }
+        }
         let mut gasto = 0usize;
         let mut vistos = 0usize;
         let total = self.bitmaps_vigiados.len();

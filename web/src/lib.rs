@@ -1475,6 +1475,8 @@ pub fn n7_memoria(i: u32) -> f64 {
         42 => m::LEITURAS_COMPACTAS.load(Relaxed) as f64,
         43..=56 => m::FOTO_PICO[(i - 43) as usize].load(Relaxed) as f64,
         57..=80 => m::criados((i - 57) as usize) as f64,
+        81..=88 => m::CENSO[(i - 81) as usize].load(Relaxed) as f64,
+        89..=96 => m::CENSO_BYTES[(i - 89) as usize].load(Relaxed) as f64,
         _ => -1.0,
     }
 }
@@ -1508,10 +1510,12 @@ pub fn n7_fator_memoria(valor: f64) -> f64 {
 
 /// Naruto Legaxy: compactacao de imagens paradas — quadros de ociosidade e orcamento (bytes) por quadro
 /// (0 mantem). Devolve "quadros,orcamento". iPhone: menos quadros e mais orcamento (pico da luta).
+/// Devolve f64 (quadros em vigor): a pagina chama o EXPORT CRU do wasm, e funcao que devolve String
+/// recebe um ponteiro de retorno como 1o argumento (os parametros ficariam deslocados).
 #[wasm_bindgen]
-pub fn n7_compactacao(quadros: f64, orcamento: f64) -> String {
-    let (q, o) = ruffle_core::memoria_n7::definir_compactacao(quadros, orcamento);
-    format!("{q},{o}")
+pub fn n7_compactacao(quadros: f64, orcamento: f64) -> f64 {
+    let (q, _o) = ruffle_core::memoria_n7::definir_compactacao(quadros, orcamento);
+    q as f64
 }
 
 /// Ajusta a divida de GC por quadro (fracao dos objetos vivos; 0 desliga). Devolve o valor atual.

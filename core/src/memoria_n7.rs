@@ -466,6 +466,11 @@ pub fn pressao_interna() -> bool {
 static ULTIMA_COLETA_TOTAL: AtomicU64 = AtomicU64::new(0);
 /// Coletas completas feitas por pressao interna.
 pub static COLETAS_POR_PRESSAO: AtomicU64 = AtomicU64::new(0);
+/// Texturas descartadas da GPU por ficarem sem desenho (recriadas quando a imagem volta a aparecer).
+pub static TEXTURAS_DESCARTADAS: AtomicU64 = AtomicU64::new(0);
+/// Quadros sem desenho para descartar a textura: normal ~10 s; sob pressao de texturas ~2 s.
+pub const QUADROS_TEXTURA_OCIOSA: u64 = 300;
+pub const QUADROS_TEXTURA_OCIOSA_PRESSAO: u64 = 60;
 /// Sob pressao interna, no maximo a cada 45 quadros: vale fechar um ciclo completo do coletor agora
 /// (na luta da Arena do iPhone, 400-500 MB de quadros de skill ja eram lixo mas esperavam a divida).
 pub fn coleta_total_sob_pressao() -> bool {

@@ -472,6 +472,9 @@ pub struct BitmapRawData<'gc> {
     /// Quadro do ultimo acesso da CPU aos pixels.
     #[collect(require_static)]
     ultimo_acesso: std::cell::Cell<u64>,
+    /// Quadro do ultimo desenho (pedido do `bitmap_handle`): textura parada ha muito e descartada da GPU.
+    #[collect(require_static)]
+    ultimo_desenho: std::cell::Cell<u64>,
 
     /// Ja tentou compactar e nao valeu a pena (nao tenta de novo ate a proxima escrita).
     #[collect(require_static)]
@@ -599,6 +602,7 @@ mod wrapper {
                     compactado: Default::default(),
                     leitura_compacta: Default::default(),
                     ultimo_acesso: Default::default(),
+                    ultimo_desenho: Default::default(),
                     nao_compacta: Default::default(),
                     textura_compartilhada: std::cell::OnceCell::new(),
                     width: 0,
@@ -629,6 +633,7 @@ mod wrapper {
                 compactado: Default::default(),
                 leitura_compacta: Default::default(),
                 ultimo_acesso: Default::default(),
+                    ultimo_desenho: Default::default(),
                 nao_compacta: Default::default(),
                 textura_compartilhada: std::cell::OnceCell::new(),
                 width: data.width,
@@ -888,6 +893,7 @@ impl<'gc> BitmapRawData<'gc> {
             compactado: Default::default(),
             leitura_compacta: Default::default(),
             ultimo_acesso: std::cell::Cell::new(crate::memoria_n7::quadro_atual()),
+            ultimo_desenho: Default::default(),
             nao_compacta: Default::default(),
             pixels: OnceCell::from(Arc::new(vec![
                 Color::bgra_u32(fill_color).to_premultiplied_alpha(transparency);
@@ -920,6 +926,7 @@ impl<'gc> BitmapRawData<'gc> {
             compactado: Default::default(),
             leitura_compacta: Default::default(),
             ultimo_acesso: std::cell::Cell::new(crate::memoria_n7::quadro_atual()),
+            ultimo_desenho: Default::default(),
             nao_compacta: Default::default(),
             textura_compartilhada: OnceCell::new(),
             width,
@@ -1069,6 +1076,32 @@ impl<'gc> BitmapRawData<'gc> {
         (7, bytes)
     }
 
+    /// Naruto Legaxy: descarta da GPU a textura de uma imagem que nao e desenhada ha `ociosos` quadros
+    /// (a luta da Arena no iPhone chegava a 3500 texturas / 490 MB de quadros de skill ja exibidos).
+    /// So quando da para recria-la: pixels na CPU, compactados ou fonte do simbolo; nunca com escrita
+    /// pendente na GPU (a GPU teria a unica copia). Devolve os bytes da textura descartada.
+    pub(crate) fn descartar_textura_se_parada(&mut self, quadro: u64, ociosos: u64) -> u64 {
+        if self.disposed || self.bitmap_handle.is_none() {
+            return 0;
+        }
+        if matches!(self.dirty_state, DirtyState::GpuModified(..)) {
+            return 0;
+        }
+        if quadro.saturating_sub(self.ultimo_desenho.get()) < ociosos {
+            return 0;
+        }
+        let pode = self.pixels.get().is_some()
+            || self.compactado.borrow().is_some()
+            || self.fonte.is_some();
+        if !pode {
+            return 0;
+        }
+        self.bitmap_handle = None;
+        self.textura_compartilhada = OnceCell::new();
+        crate::memoria_n7::contar(&crate::memoria_n7::TEXTURAS_DESCARTADAS);
+        self.width as u64 * self.height as u64 * 4
+    }
+
     pub(crate) fn compactar_se_parada(&mut self, quadro: u64, ociosos: u64, solta_simbolo: bool) -> usize {
         use crate::memoria_n7 as m;
         // Naruto Legaxy: imagem com escrita pendente TAMBEM compacta (a luta da Arena no iPhone tinha
@@ -1182,6 +1215,7 @@ impl<'gc> BitmapRawData<'gc> {
         &mut self,
         renderer: &mut dyn RenderBackend,
     ) -> Result<BitmapHandle, ruffle_render::error::Error> {
+        self.ultimo_desenho.set(crate::memoria_n7::quadro_atual());
         if let Some(ref handle) = self.bitmap_handle {
             return Ok(handle.clone());
         }

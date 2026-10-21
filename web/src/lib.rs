@@ -1477,6 +1477,7 @@ pub fn n7_memoria(i: u32) -> f64 {
         57..=80 => m::criados((i - 57) as usize) as f64,
         81..=88 => m::CENSO[(i - 81) as usize].load(Relaxed) as f64,
         97 => m::COLETAS_POR_PRESSAO.load(Relaxed) as f64,
+        98 => m::TEXTURAS_DESCARTADAS.load(Relaxed) as f64,
         89..=96 => m::CENSO_BYTES[(i - 89) as usize].load(Relaxed) as f64,
         _ => -1.0,
     }

@@ -506,6 +506,9 @@ impl<'gc> Library<'gc> {
         let ociosos = if pressao { (m::quadros_ociosa() / 3).max(10) } else { m::quadros_ociosa() };
         let orcamento = if pressao { m::orcamento_compactar() * 4 } else { m::orcamento_compactar() };
         let max_vistos = if pressao { 4096 } else if orcamento > 2 * 1024 * 1024 { 1024 } else { 256 };
+        // texturas na GPU: acima do mesmo limite, descarta as sem desenho ha ~2 s (senao ~10 s)
+        let pressao_tex = limite > 0 && ruffle_render::memoria::bytes_texturas() > limite;
+        let ociosos_tex = if pressao_tex { m::QUADROS_TEXTURA_OCIOSA_PRESSAO } else { m::QUADROS_TEXTURA_OCIOSA };
         while gasto < orcamento && vistos < total.min(max_vistos) && !self.bitmaps_vigiados.is_empty() {
             vistos += 1;
             if self.cursor_vigia >= self.bitmaps_vigiados.len() {
@@ -523,6 +526,7 @@ impl<'gc> Library<'gc> {
                             self.bitmaps_vigiados.swap_remove(i);
                             continue;
                         }
+                        dados.descartar_textura_se_parada(quadro, ociosos_tex);
                         gasto += dados.compactar_se_parada(quadro, ociosos, pressao);
                     }
                     self.cursor_vigia += 1;

@@ -1516,6 +1516,11 @@ impl<'gc> MovieClip<'gc> {
         let library = context.library.library_for_movie_mut(movie);
         match library.instantiate_by_id(id, context.gc_context) {
             Some(child) => {
+                // Naruto Legaxy: bitmap colocado pela linha do tempo entra na vigilancia (compactacao,
+                // pressao e descarte de textura parada)
+                if let Some(b) = child.as_bitmap() {
+                    context.library.vigiar_bitmap(b.bitmap_data());
+                }
                 // Remove previous child from children list,
                 // and add new child onto front of the list.
                 let prev_child = self.replace_at_depth(context, child, depth);

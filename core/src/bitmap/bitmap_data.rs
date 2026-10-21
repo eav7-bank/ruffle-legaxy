@@ -1046,8 +1046,10 @@ impl<'gc> BitmapRawData<'gc> {
         if self.disposed || self.nao_compacta.get() {
             return (0, bytes);
         }
-        if !matches!(self.dirty_state, DirtyState::Clean) {
-            return (1, bytes);
+        match self.dirty_state {
+            DirtyState::CpuModified(_) => return (1, bytes),
+            DirtyState::GpuModified(..) => return (4, bytes),
+            DirtyState::Clean => {}
         }
         if quadro.saturating_sub(self.ultimo_acesso.get()) < m::quadros_ociosa() {
             return (2, bytes);
@@ -1056,7 +1058,7 @@ impl<'gc> BitmapRawData<'gc> {
             return (3, 0);
         };
         if bytes < m::MINIMO_COMPACTAR as u64 {
-            return (4, bytes);
+            return (0, bytes);
         }
         if self.fonte.is_some() && self.textura_compartilhada.get().is_some() {
             return (6, bytes);
@@ -1069,8 +1071,11 @@ impl<'gc> BitmapRawData<'gc> {
 
     pub(crate) fn compactar_se_parada(&mut self, quadro: u64) -> usize {
         use crate::memoria_n7 as m;
-        if self.disposed || self.nao_compacta.get() || !matches!(self.dirty_state, DirtyState::Clean)
-        {
+        // Naruto Legaxy: imagem com escrita pendente TAMBEM compacta (a luta da Arena no iPhone tinha
+        // ~490 MB de copias na CPU de imagens desenhadas pelo jogo). GpuModified: a GPU tem a verdade e a
+        // leitura pela CPU descompacta antes de sincronizar a regiao; CpuModified: o envio a GPU passa
+        // por px(), que descompacta. So o simbolo sem escrita exige estado limpo (abaixo).
+        if self.disposed || self.nao_compacta.get() {
             return 0;
         }
         if quadro.saturating_sub(self.ultimo_acesso.get()) < m::quadros_ociosa() {
@@ -1084,7 +1089,10 @@ impl<'gc> BitmapRawData<'gc> {
             return 0;
         }
         // simbolo sem escrita: os pixels sao os do simbolo, decodificados de novo se precisar
-        if self.fonte.is_some() && self.textura_compartilhada.get().is_some() {
+        if self.fonte.is_some()
+            && self.textura_compartilhada.get().is_some()
+            && matches!(self.dirty_state, DirtyState::Clean)
+        {
             self.pixels = OnceCell::new();
             m::contar(&m::SIMBOLOS_SOLTOS);
             return 0;

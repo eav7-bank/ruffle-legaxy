@@ -1045,7 +1045,7 @@ impl<'gc> BitmapRawData<'gc> {
         {
             return 0;
         }
-        if quadro.saturating_sub(self.ultimo_acesso.get()) < m::QUADROS_OCIOSA {
+        if quadro.saturating_sub(self.ultimo_acesso.get()) < m::quadros_ociosa() {
             return 0;
         }
         let Some(p) = self.pixels.get() else {

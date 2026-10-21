@@ -425,12 +425,32 @@ pub fn tamanhos_n7() -> String {
 // O 1o acesso aos pixels descompacta sem o jogo perceber. Imagem de simbolo sem escrita so
 // solta os pixels (sao decodificados de novo da origem).
 
-/// Quadros sem acesso da CPU para uma imagem ser compactada (~4 s a 30 fps).
-pub const QUADROS_OCIOSA: u64 = 120;
+/// Quadros sem acesso da CPU para uma imagem ser compactada (padrao ~4 s a 30 fps; ajustavel pela
+/// pagina via `n7_compactacao`, ex.: iPhone usa menos quadros e mais orcamento).
+pub static QUADROS_OCIOSA_CFG: AtomicU64 = AtomicU64::new(120);
 /// Tamanho minimo (bytes de pixels) para valer a pena.
 pub const MINIMO_COMPACTAR: usize = 64 * 1024;
-/// Bytes de pixels examinados para compactar por quadro (limite de tempo de CPU).
-pub const ORCAMENTO_COMPACTAR: usize = 2 * 1024 * 1024;
+/// Bytes de pixels examinados para compactar por quadro (limite de tempo de CPU; ajustavel).
+pub static ORCAMENTO_COMPACTAR_CFG: AtomicU64 = AtomicU64::new(2 * 1024 * 1024);
+
+#[inline]
+pub fn quadros_ociosa() -> u64 {
+    QUADROS_OCIOSA_CFG.load(Ordering::Relaxed)
+}
+#[inline]
+pub fn orcamento_compactar() -> usize {
+    ORCAMENTO_COMPACTAR_CFG.load(Ordering::Relaxed) as usize
+}
+/// Ajusta a compactacao (0 ou negativo mantem). Devolve (quadros, orcamento em bytes).
+pub fn definir_compactacao(quadros: f64, orcamento: f64) -> (u64, u64) {
+    if quadros >= 1.0 {
+        QUADROS_OCIOSA_CFG.store(quadros as u64, Ordering::Relaxed);
+    }
+    if orcamento >= 65536.0 {
+        ORCAMENTO_COMPACTAR_CFG.store(orcamento as u64, Ordering::Relaxed);
+    }
+    (quadros_ociosa(), orcamento_compactar() as u64)
+}
 
 /// Imagens compactadas, bytes de pixels antes e depois, descompactacoes e simbolos soltos.
 pub static COMPACTADAS: AtomicU64 = AtomicU64::new(0);

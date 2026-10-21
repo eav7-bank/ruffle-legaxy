@@ -1506,6 +1506,14 @@ pub fn n7_fator_memoria(valor: f64) -> f64 {
     m::fator_total_memory()
 }
 
+/// Naruto Legaxy: compactacao de imagens paradas — quadros de ociosidade e orcamento (bytes) por quadro
+/// (0 mantem). Devolve "quadros,orcamento". iPhone: menos quadros e mais orcamento (pico da luta).
+#[wasm_bindgen]
+pub fn n7_compactacao(quadros: f64, orcamento: f64) -> String {
+    let (q, o) = ruffle_core::memoria_n7::definir_compactacao(quadros, orcamento);
+    format!("{q},{o}")
+}
+
 /// Ajusta a divida de GC por quadro (fracao dos objetos vivos; 0 desliga). Devolve o valor atual.
 #[wasm_bindgen]
 pub fn n7_fator_coleta(valor: f64) -> f64 {

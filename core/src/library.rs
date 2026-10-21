@@ -476,7 +476,9 @@ impl<'gc> Library<'gc> {
         let mut gasto = 0usize;
         let mut vistos = 0usize;
         let total = self.bitmaps_vigiados.len();
-        while gasto < m::ORCAMENTO_COMPACTAR && vistos < total.min(256) && !self.bitmaps_vigiados.is_empty() {
+        let orcamento = m::orcamento_compactar();
+        let max_vistos = if orcamento > 2 * 1024 * 1024 { 1024 } else { 256 };
+        while gasto < orcamento && vistos < total.min(max_vistos) && !self.bitmaps_vigiados.is_empty() {
             vistos += 1;
             if self.cursor_vigia >= self.bitmaps_vigiados.len() {
                 self.cursor_vigia = 0;

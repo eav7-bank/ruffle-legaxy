@@ -448,13 +448,23 @@ pub fn orcamento_compactar() -> usize {
 pub static CENSO: [AtomicU64; 8] = [const { AtomicU64::new(0) }; 8];
 pub static CENSO_BYTES: [AtomicU64; 8] = [const { AtomicU64::new(0) }; 8];
 
-/// Ajusta a compactacao (0 ou negativo mantem). Devolve (quadros, orcamento em bytes).
-pub fn definir_compactacao(quadros: f64, orcamento: f64) -> (u64, u64) {
+/// Pressao: acima deste total de bytes de pixels de bitmap (0 = desligado), compacta sem esperar
+/// ociosidade e com 4x o orcamento (achata o pico ao carregar a luta; iPhone).
+pub static LIMITE_BMP_CFG: AtomicU64 = AtomicU64::new(0);
+#[inline]
+pub fn limite_bmp() -> u64 {
+    LIMITE_BMP_CFG.load(Ordering::Relaxed)
+}
+/// Ajusta a compactacao (0 ou negativo mantem; limite 0 desliga a pressao). Devolve (quadros, orcamento).
+pub fn definir_compactacao(quadros: f64, orcamento: f64, limite: f64) -> (u64, u64) {
     if quadros >= 1.0 {
         QUADROS_OCIOSA_CFG.store(quadros as u64, Ordering::Relaxed);
     }
     if orcamento >= 65536.0 {
         ORCAMENTO_COMPACTAR_CFG.store(orcamento as u64, Ordering::Relaxed);
+    }
+    if limite >= 0.0 {
+        LIMITE_BMP_CFG.store(limite as u64, Ordering::Relaxed);
     }
     (quadros_ociosa(), orcamento_compactar() as u64)
 }

@@ -1513,8 +1513,8 @@ pub fn n7_fator_memoria(valor: f64) -> f64 {
 /// Devolve f64 (quadros em vigor): a pagina chama o EXPORT CRU do wasm, e funcao que devolve String
 /// recebe um ponteiro de retorno como 1o argumento (os parametros ficariam deslocados).
 #[wasm_bindgen]
-pub fn n7_compactacao(quadros: f64, orcamento: f64) -> f64 {
-    let (q, _o) = ruffle_core::memoria_n7::definir_compactacao(quadros, orcamento);
+pub fn n7_compactacao(quadros: f64, orcamento: f64, limite: f64) -> f64 {
+    let (q, _o) = ruffle_core::memoria_n7::definir_compactacao(quadros, orcamento, limite);
     q as f64
 }
 

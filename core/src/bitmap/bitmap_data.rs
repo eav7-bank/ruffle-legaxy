@@ -1069,7 +1069,7 @@ impl<'gc> BitmapRawData<'gc> {
         (7, bytes)
     }
 
-    pub(crate) fn compactar_se_parada(&mut self, quadro: u64) -> usize {
+    pub(crate) fn compactar_se_parada(&mut self, quadro: u64, ociosos: u64) -> usize {
         use crate::memoria_n7 as m;
         // Naruto Legaxy: imagem com escrita pendente TAMBEM compacta (a luta da Arena no iPhone tinha
         // ~490 MB de copias na CPU de imagens desenhadas pelo jogo). GpuModified: a GPU tem a verdade e a
@@ -1078,7 +1078,7 @@ impl<'gc> BitmapRawData<'gc> {
         if self.disposed || self.nao_compacta.get() {
             return 0;
         }
-        if quadro.saturating_sub(self.ultimo_acesso.get()) < m::quadros_ociosa() {
+        if quadro.saturating_sub(self.ultimo_acesso.get()) < ociosos {
             return 0;
         }
         let Some(p) = self.pixels.get() else {

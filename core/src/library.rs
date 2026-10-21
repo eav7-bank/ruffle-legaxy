@@ -493,8 +493,12 @@ impl<'gc> Library<'gc> {
         let mut gasto = 0usize;
         let mut vistos = 0usize;
         let total = self.bitmaps_vigiados.len();
-        let orcamento = m::orcamento_compactar();
-        let max_vistos = if orcamento > 2 * 1024 * 1024 { 1024 } else { 256 };
+        // pressao: muitos bytes de bitmap vivos -> compacta ja (1 quadro) com 4x o orcamento
+        let limite = m::limite_bmp();
+        let pressao = limite > 0 && m::BMP_BYTES.load(std::sync::atomic::Ordering::Relaxed) > limite;
+        let ociosos = if pressao { 1 } else { m::quadros_ociosa() };
+        let orcamento = if pressao { m::orcamento_compactar() * 4 } else { m::orcamento_compactar() };
+        let max_vistos = if pressao { 4096 } else if orcamento > 2 * 1024 * 1024 { 1024 } else { 256 };
         while gasto < orcamento && vistos < total.min(max_vistos) && !self.bitmaps_vigiados.is_empty() {
             vistos += 1;
             if self.cursor_vigia >= self.bitmaps_vigiados.len() {
@@ -512,7 +516,7 @@ impl<'gc> Library<'gc> {
                             self.bitmaps_vigiados.swap_remove(i);
                             continue;
                         }
-                        gasto += dados.compactar_se_parada(quadro);
+                        gasto += dados.compactar_se_parada(quadro, ociosos);
                     }
                     self.cursor_vigia += 1;
                 }

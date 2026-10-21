@@ -495,7 +495,10 @@ impl<'gc> Library<'gc> {
         let total = self.bitmaps_vigiados.len();
         // pressao: muitos bytes de bitmap vivos -> compacta ja (1 quadro) com 4x o orcamento
         let limite = m::limite_bmp();
-        let pressao = limite > 0 && m::BMP_BYTES.load(std::sync::atomic::Ordering::Relaxed) > limite;
+        // bytes de pixels proprios + quadros de simbolo decodificados (blocos >= 1 MiB da etiqueta 4): na luta
+        // da Arena no iPhone eram 433 MB de quadros de skill lidos pela CPU, invisiveis ao BMP_BYTES
+        let simbolos = m::GRANDES_POR_ETIQUETA[4].load(std::sync::atomic::Ordering::Relaxed) as u64;
+        let pressao = limite > 0 && m::BMP_BYTES.load(std::sync::atomic::Ordering::Relaxed) + simbolos > limite;
         let ociosos = if pressao { 1 } else { m::quadros_ociosa() };
         let orcamento = if pressao { m::orcamento_compactar() * 4 } else { m::orcamento_compactar() };
         let max_vistos = if pressao { 4096 } else if orcamento > 2 * 1024 * 1024 { 1024 } else { 256 };
@@ -516,7 +519,7 @@ impl<'gc> Library<'gc> {
                             self.bitmaps_vigiados.swap_remove(i);
                             continue;
                         }
-                        gasto += dados.compactar_se_parada(quadro, ociosos);
+                        gasto += dados.compactar_se_parada(quadro, ociosos, pressao);
                     }
                     self.cursor_vigia += 1;
                 }

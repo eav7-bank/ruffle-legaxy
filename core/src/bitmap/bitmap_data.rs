@@ -1069,7 +1069,7 @@ impl<'gc> BitmapRawData<'gc> {
         (7, bytes)
     }
 
-    pub(crate) fn compactar_se_parada(&mut self, quadro: u64, ociosos: u64) -> usize {
+    pub(crate) fn compactar_se_parada(&mut self, quadro: u64, ociosos: u64, solta_simbolo: bool) -> usize {
         use crate::memoria_n7 as m;
         // Naruto Legaxy: imagem com escrita pendente TAMBEM compacta (a luta da Arena no iPhone tinha
         // ~490 MB de copias na CPU de imagens desenhadas pelo jogo). GpuModified: a GPU tem a verdade e a
@@ -1089,8 +1089,9 @@ impl<'gc> BitmapRawData<'gc> {
             return 0;
         }
         // simbolo sem escrita: os pixels sao os do simbolo, decodificados de novo se precisar
+        // (sob pressao solta mesmo sem textura na GPU: o proximo acesso decodifica de novo do SWF)
         if self.fonte.is_some()
-            && self.textura_compartilhada.get().is_some()
+            && (self.textura_compartilhada.get().is_some() || solta_simbolo)
             && matches!(self.dirty_state, DirtyState::Clean)
         {
             self.pixels = OnceCell::new();

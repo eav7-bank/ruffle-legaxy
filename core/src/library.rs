@@ -499,7 +499,9 @@ impl<'gc> Library<'gc> {
         // da Arena no iPhone eram 433 MB de quadros de skill lidos pela CPU, invisiveis ao BMP_BYTES
         let simbolos = m::GRANDES_POR_ETIQUETA[4].load(std::sync::atomic::Ordering::Relaxed) as u64;
         let pressao = limite > 0 && m::BMP_BYTES.load(std::sync::atomic::Ordering::Relaxed) + simbolos > limite;
-        let ociosos = if pressao { 1 } else { m::quadros_ociosa() };
+        // sob pressao: ociosidade menor (nunca 1 quadro: imagem lida a cada poucos quadros entraria em
+        // compacta/descompacta sem fim), minimo 10 quadros
+        let ociosos = if pressao { (m::quadros_ociosa() / 3).max(10) } else { m::quadros_ociosa() };
         let orcamento = if pressao { m::orcamento_compactar() * 4 } else { m::orcamento_compactar() };
         let max_vistos = if pressao { 4096 } else if orcamento > 2 * 1024 * 1024 { 1024 } else { 256 };
         while gasto < orcamento && vistos < total.min(max_vistos) && !self.bitmaps_vigiados.is_empty() {

@@ -1078,7 +1078,8 @@ impl<'gc> BitmapRawData<'gc> {
         if self.disposed || self.nao_compacta.get() {
             return 0;
         }
-        if quadro.saturating_sub(self.ultimo_acesso.get()) < ociosos {
+        let ocioso_ha = quadro.saturating_sub(self.ultimo_acesso.get());
+        if ocioso_ha < ociosos {
             return 0;
         }
         let Some(p) = self.pixels.get() else {
@@ -1090,8 +1091,10 @@ impl<'gc> BitmapRawData<'gc> {
         }
         // simbolo sem escrita: os pixels sao os do simbolo, decodificados de novo se precisar
         // (sob pressao solta mesmo sem textura na GPU: o proximo acesso decodifica de novo do SWF)
+        // (sob pressao solta mesmo sem textura na GPU, mas so apos 30 quadros sem leitura: o proximo
+        // acesso decodifica de novo do SWF)
         if self.fonte.is_some()
-            && (self.textura_compartilhada.get().is_some() || solta_simbolo)
+            && (self.textura_compartilhada.get().is_some() || (solta_simbolo && ocioso_ha >= 30))
             && matches!(self.dirty_state, DirtyState::Clean)
         {
             self.pixels = OnceCell::new();

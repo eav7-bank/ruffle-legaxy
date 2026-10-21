@@ -145,9 +145,9 @@ pub fn init<'gc>(
 
     new_bitmap_data.init_object2(activation.gc(), bitmap_data_obj);
     bitmap_data_obj.init_bitmap_data(activation.gc(), new_bitmap_data);
-    if !matches!(character, Some(Character::Bitmap(_))) {
-        activation.context.library.vigiar_bitmap(new_bitmap_data);
-    }
+    // Naruto Legaxy: vigia TAMBEM as instancias de simbolo (`new ClasseDoQuadro()`): na luta da Arena do
+    // iPhone eram 400-500 MB de quadros de skill decodificados (lidos pela CPU) que nunca eram soltos.
+    activation.context.library.vigiar_bitmap(new_bitmap_data);
 
     Ok(Value::Undefined)
 }

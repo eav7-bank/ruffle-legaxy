@@ -455,6 +455,32 @@ pub static LIMITE_BMP_CFG: AtomicU64 = AtomicU64::new(0);
 pub fn limite_bmp() -> u64 {
     LIMITE_BMP_CFG.load(Ordering::Relaxed)
 }
+/// Pressao interna: bytes de pixels proprios + quadros de simbolo decodificados (blocos >= 1 MiB da
+/// etiqueta 4) acima do limite configurado pela pagina.
+pub fn pressao_interna() -> bool {
+    let limite = limite_bmp();
+    limite > 0
+        && BMP_BYTES.load(Ordering::Relaxed) + GRANDES_POR_ETIQUETA[4].load(Ordering::Relaxed) as u64 > limite
+}
+
+static ULTIMA_COLETA_TOTAL: AtomicU64 = AtomicU64::new(0);
+/// Coletas completas feitas por pressao interna.
+pub static COLETAS_POR_PRESSAO: AtomicU64 = AtomicU64::new(0);
+/// Sob pressao interna, no maximo a cada 45 quadros: vale fechar um ciclo completo do coletor agora
+/// (na luta da Arena do iPhone, 400-500 MB de quadros de skill ja eram lixo mas esperavam a divida).
+pub fn coleta_total_sob_pressao() -> bool {
+    if !pressao_interna() {
+        return false;
+    }
+    let q = quadro_atual();
+    if q.saturating_sub(ULTIMA_COLETA_TOTAL.load(Ordering::Relaxed)) < 45 {
+        return false;
+    }
+    ULTIMA_COLETA_TOTAL.store(q, Ordering::Relaxed);
+    COLETAS_POR_PRESSAO.fetch_add(1, Ordering::Relaxed);
+    true
+}
+
 /// Ajusta a compactacao (0 ou negativo mantem; limite 0 desliga a pressao). Devolve (quadros, orcamento).
 pub fn definir_compactacao(quadros: f64, orcamento: f64, limite: f64) -> (u64, u64) {
     if quadros >= 1.0 {

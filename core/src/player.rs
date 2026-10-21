@@ -2491,7 +2491,11 @@ impl Player {
             let vivos = m.total_gc_count() as f64;
             let divida = m.allocation_debt();
             let teto = vivos * TETO_DIVIDA_POR_UPDATE;
-            if divida > teto && divida < vivos * DIVIDA_MAXIMA {
+            if crate::memoria_n7::coleta_total_sob_pressao() {
+                // pressao interna de memoria (iPhone): fecha o ciclo e solta o lixo agora
+                arena.finish_cycle();
+                arena.finish_cycle();
+            } else if divida > teto && divida < vivos * DIVIDA_MAXIMA {
                 let sobra = divida - teto;
                 m.adjust_debt(-sobra);
                 arena.collect_debt();

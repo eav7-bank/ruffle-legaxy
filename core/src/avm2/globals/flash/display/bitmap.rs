@@ -55,6 +55,8 @@ pub fn bitmap_allocator<'gc>(
             let bitmap_data_obj =
                 BitmapDataObject::from_bitmap_data(activation.context, new_bitmap_data);
             new_bitmap_data.init_object2(activation.gc(), bitmap_data_obj);
+            // Naruto Legaxy: vigiado para compactacao/pressao (quadros de skill lidos pela CPU)
+            activation.context.library.vigiar_bitmap(new_bitmap_data);
 
             let child = Bitmap::new_with_bitmap_data(
                 activation.gc(),

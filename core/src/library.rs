@@ -236,15 +236,17 @@ impl<'gc> MovieLibrary<'gc> {
         match character {
             Character::Bitmap(bitmap) => {
                 let avm2_class = bitmap.avm2_class();
-                // pixels decodificados compartilhados entre as instancias vivas do simbolo
-                let d = bitmap.pixels_compartilhados().unwrap();
-                let bitmap_data = crate::bitmap::bitmap_data::BitmapData::new_compartilhado(
+                // Naruto Legaxy: simbolo colocado pela linha do tempo (clipes de efeito de skill) tambem e
+                // PREGUICOSO: decodifica so ao desenhar e solta a copia da CPU apos o envio a GPU. Antes
+                // decodificava todos os quadros ao instanciar o clipe e segurava os pixels enquanto ele
+                // vivia (~400 MB na luta da Arena do iPhone).
+                let tam = bitmap.compressed().size();
+                let bitmap_data = crate::bitmap::bitmap_data::BitmapData::new_preguicoso(
                     mc,
-                    d.width,
-                    d.height,
-                    d.transparente,
-                    d.pixels,
-                    d.textura,
+                    tam.width,
+                    tam.height,
+                    true,
+                    bitmap.fonte(),
                 );
                 let bitmap = Bitmap::new_with_bitmap_data(mc, id, bitmap_data, true, self.swf);
                 bitmap.set_avm2_bitmapdata_class(mc, avm2_class);

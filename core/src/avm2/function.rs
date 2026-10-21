@@ -53,6 +53,12 @@ impl<'gc> BoundMethod<'gc> {
         }
     }
 
+    /// Naruto Legaxy: (metodo, receptor) de um metodo vinculado, para igualdade por VALOR (como o
+    /// MethodClosure do avmplus: dois `obj.m` sao iguais sem precisarem ser o mesmo objeto).
+    pub fn vinculo(&self) -> Option<(Method<'gc>, Value<'gc>)> {
+        self.bound_receiver.map(|r| (self.method, r))
+    }
+
     pub fn exec(
         &self,
         unbound_receiver: Value<'gc>,

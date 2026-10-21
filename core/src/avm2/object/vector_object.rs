@@ -26,7 +26,7 @@ pub fn vector_allocator<'gc>(
         .param()
         .expect("Class is parametrized vector");
 
-    Ok(VectorObject(Gc::new(
+    Ok(VectorObject(ruffle_common::gc_contado!(4, 
         activation.gc(),
         VectorObjectData {
             base,
@@ -75,7 +75,7 @@ impl<'gc> VectorObject<'gc> {
 
         let applied_class = vector_class.parametrize(activation, value_type);
 
-        VectorObject(Gc::new(
+        VectorObject(ruffle_common::gc_contado!(4, 
             activation.gc(),
             VectorObjectData {
                 base: ScriptObjectData::new(applied_class),

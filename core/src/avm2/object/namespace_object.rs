@@ -52,7 +52,7 @@ impl<'gc> NamespaceObject<'gc> {
         let class = activation.avm2().classes().namespace;
         let base = ScriptObjectData::new(class);
 
-        NamespaceObject(Gc::new(
+        NamespaceObject(ruffle_common::gc_contado!(18, 
             activation.gc(),
             NamespaceObjectData {
                 base,
@@ -67,7 +67,7 @@ impl<'gc> NamespaceObject<'gc> {
         let class = activation.avm2().classes().namespace;
         let base = ScriptObjectData::new(class);
 
-        NamespaceObject(Gc::new(
+        NamespaceObject(ruffle_common::gc_contado!(18, 
             activation.gc(),
             NamespaceObjectData {
                 base,

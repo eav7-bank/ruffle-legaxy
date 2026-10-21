@@ -46,7 +46,7 @@ pub fn byte_array_allocator<'gc>(
 
     let base = ScriptObjectData::new(class);
 
-    Ok(ByteArrayObject(Gc::new(
+    Ok(ByteArrayObject(ruffle_common::gc_contado!(14, 
         activation.gc(),
         ByteArrayObjectData {
             base,
@@ -87,7 +87,7 @@ impl<'gc> ByteArrayObject<'gc> {
         let class = context.avm2.classes().bytearray;
         let base = ScriptObjectData::new(class);
 
-        ByteArrayObject(Gc::new(
+        ByteArrayObject(ruffle_common::gc_contado!(14, 
             context.gc(),
             ByteArrayObjectData {
                 base,

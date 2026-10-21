@@ -46,7 +46,7 @@ impl<'gc> StringContext<'gc> {
         let mc = self.gc();
         self.interner.intern_inner(mc, s, |s| {
             let repr = AvmStringRepr::from_raw(s.into_owned(), true);
-            Gc::new(mc, repr)
+            crate::gc_contado!(2, mc, repr)
         })
     }
 
@@ -55,7 +55,7 @@ impl<'gc> StringContext<'gc> {
         let mc = self.gc();
         self.interner.intern_inner(mc, s, |s| {
             let repr = AvmStringRepr::from_raw_static(s, true);
-            Gc::new(mc, repr)
+            crate::gc_contado!(2, mc, repr)
         })
     }
 

@@ -153,6 +153,7 @@ impl<'gc> ScriptObjectData<'gc> {
         proto: Option<Object<'gc>>,
         vtable: VTable<'gc>,
     ) -> Self {
+        ruffle_common::contagem_n7::criado(0);
         let slot_table = vtable.slot_table();
 
         // We use `iter` and `collect` rather than setting elements of a Box<[]>

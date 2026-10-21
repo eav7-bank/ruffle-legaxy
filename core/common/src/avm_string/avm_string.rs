@@ -16,7 +16,7 @@ impl<'gc> AvmString<'gc> {
     pub(super) fn to_fully_owned(self, mc: &Mutation<'gc>) -> Gc<'gc, AvmStringRepr<'gc>> {
         if self.0.is_dependent() {
             let repr = AvmStringRepr::from_raw(WString::from(self.as_wstr()), false);
-            Gc::new(mc, repr)
+            crate::gc_contado!(2, mc, repr)
         } else {
             self.0
         }
@@ -24,7 +24,7 @@ impl<'gc> AvmString<'gc> {
 
     pub fn new_ascii_static(gc_context: &Mutation<'gc>, bytes: &'static [u8]) -> Self {
         let repr = AvmStringRepr::from_raw_static(WStr::from_units(bytes), false);
-        Self(Gc::new(gc_context, repr))
+        Self(crate::gc_contado!(2, gc_context, repr))
     }
 
     pub fn new_utf8<'s, S: Into<Cow<'s, str>>>(gc_context: &Mutation<'gc>, string: S) -> Self {
@@ -33,7 +33,7 @@ impl<'gc> AvmString<'gc> {
             Cow::Borrowed(utf8) => WString::from_utf8(utf8),
         };
         let repr = AvmStringRepr::from_raw(buf, false);
-        Self(Gc::new(gc_context, repr))
+        Self(crate::gc_contado!(2, gc_context, repr))
     }
 
     pub fn new_utf8_bytes(gc_context: &Mutation<'gc>, bytes: &[u8]) -> Self {
@@ -43,12 +43,12 @@ impl<'gc> AvmString<'gc> {
 
     pub fn new<S: Into<WString>>(gc_context: &Mutation<'gc>, string: S) -> Self {
         let repr = AvmStringRepr::from_raw(string.into(), false);
-        Self(Gc::new(gc_context, repr))
+        Self(crate::gc_contado!(2, gc_context, repr))
     }
 
     pub fn substring(mc: &Mutation<'gc>, string: AvmString<'gc>, start: usize, end: usize) -> Self {
         let repr = AvmStringRepr::new_dependent(string.0, start, end);
-        Self(Gc::new(mc, repr))
+        Self(crate::gc_contado!(2, mc, repr))
     }
 
     pub fn is_dependent(&self) -> bool {
@@ -77,7 +77,7 @@ impl<'gc> AvmString<'gc> {
         } else if right.is_empty() {
             left
         } else if let Some(repr) = AvmStringRepr::try_append_inline(left.0, &right) {
-            Self(Gc::new(mc, repr))
+            Self(crate::gc_contado!(2, mc, repr))
         } else {
             // When doing a non-in-place append,
             // Overallocate a bit so that further appends can be in-place.

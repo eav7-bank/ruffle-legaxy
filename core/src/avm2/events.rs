@@ -320,7 +320,7 @@ impl<'gc> EventHandler<'gc> {
 impl PartialEq for EventHandler<'_> {
     fn eq(&self, rhs: &Self) -> bool {
         self.use_capture == rhs.use_capture
-            && std::ptr::eq(self.handler.as_ptr(), rhs.handler.as_ptr())
+            && self.handler.mesmo_vinculo(rhs.handler)   // Naruto Legaxy: vinculados iguais por valor
     }
 }
 

@@ -112,7 +112,7 @@ impl<'gc> Namespace<'gc> {
 
         // Private namespaces don't get any of the namespace version checks
         if let AbcNamespace::Private(_) = abc_namespace {
-            return Ok(Self(Some(Gc::new(
+            return Ok(Self(Some(ruffle_common::gc_contado!(11, 
                 mc,
                 NamespaceData::Private(namespace_name),
             ))));
@@ -212,7 +212,7 @@ impl<'gc> Namespace<'gc> {
             AbcNamespace::StaticProtected(_) => NamespaceData::StaticProtected(namespace_name),
             AbcNamespace::Private(_) => unreachable!(),
         };
-        Ok(Self(Some(Gc::new(mc, ns))))
+        Ok(Self(Some(ruffle_common::gc_contado!(11, mc, ns))))
     }
 
     pub fn any() -> Self {
@@ -226,7 +226,7 @@ impl<'gc> Namespace<'gc> {
         context: &mut StringContext<'gc>,
     ) -> Self {
         let atom = context.intern(package_name.into());
-        Self(Some(Gc::new(
+        Self(Some(ruffle_common::gc_contado!(11, 
             context.gc(),
             NamespaceData::Namespace(atom, api_version),
         )))
@@ -238,7 +238,7 @@ impl<'gc> Namespace<'gc> {
         context: &mut StringContext<'gc>,
     ) -> Self {
         let atom = context.intern(package_name.into());
-        Self(Some(Gc::new(
+        Self(Some(ruffle_common::gc_contado!(11, 
             context.gc(),
             NamespaceData::PackageInternal(atom),
         )))

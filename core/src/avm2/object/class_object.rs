@@ -511,6 +511,7 @@ impl<'gc> ClassObject<'gc> {
             }
             Some(Property::Method { disp_id }) => {
                 let full_method = self.instance_vtable().get_full_method(disp_id).unwrap();
+                ruffle_common::contagem_n7::criado(23);
                 let callee = FunctionObject::from_method(
                     activation.context,
                     full_method.method,

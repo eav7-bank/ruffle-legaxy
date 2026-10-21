@@ -258,7 +258,7 @@ impl<'gc> Class<'gc> {
         class.super_class = super_class;
         class.instance_init = instance_init;
         class.traits = OnceLock::from(traits);
-        Class(Gc::new(mc, class))
+        Class(ruffle_common::gc_contado!(8, mc, class))
     }
 
     pub fn add_application(self, mc: &Mutation<'gc>, param: Option<Class<'gc>>, cls: Class<'gc>) {
@@ -313,14 +313,14 @@ impl<'gc> Class<'gc> {
         i_class.instance_init = object_vector_i_class.instance_init();
         i_class.call_handler = object_vector_i_class.call_handler();
         i_class.traits = OnceLock::from(Box::default());
-        let i_class = Class(Gc::new(mc, i_class));
+        let i_class = Class(ruffle_common::gc_contado!(8, mc, i_class));
 
         let mut c_class = ClassData::empty(c_name);
         c_class.super_class = Some(context.avm2.class_defs().class);
         c_class.attributes = Cell::new(ClassAttributes::FINAL);
         c_class.instance_init = object_vector_c_class.instance_init();
         c_class.traits = OnceLock::from(Box::default());
-        let c_class = Class(Gc::new(mc, c_class));
+        let c_class = Class(ruffle_common::gc_contado!(8, mc, c_class));
 
         i_class.link_with_c_class(mc, c_class);
         i_class
@@ -486,7 +486,7 @@ impl<'gc> Class<'gc> {
         class.instance_init = Some(instance_init);
         class.call_handler = call_handler;
         class.custom_constructor = custom_constructor.map(CustomConstructor);
-        Ok(Class(Gc::new(activation.gc(), class)))
+        Ok(Class(ruffle_common::gc_contado!(8, activation.gc(), class)))
     }
 
     /// Loads a c_class from a `TranslationUnit`, without loading its i_class.
@@ -533,7 +533,7 @@ impl<'gc> Class<'gc> {
         class.attributes = Cell::new(ClassAttributes::FINAL);
         class.protected_namespace = protected_namespace;
         class.instance_init = Some(class_init);
-        Ok(Class(Gc::new(activation.gc(), class)))
+        Ok(Class(ruffle_common::gc_contado!(8, activation.gc(), class)))
     }
 
     /// Finish the class-loading process by loading traits.
@@ -938,7 +938,7 @@ impl<'gc> Class<'gc> {
         let mut i_class = ClassData::empty(name);
         i_class.attributes = Cell::new(ClassAttributes::FINAL | ClassAttributes::SEALED);
         i_class.traits = OnceLock::from(traits);
-        let i_class = Class(Gc::new(activation.gc(), i_class));
+        let i_class = Class(ruffle_common::gc_contado!(8, activation.gc(), i_class));
         i_class.init_vtable(activation)?;
 
         // We don't need to construct a c_class
@@ -958,7 +958,7 @@ impl<'gc> Class<'gc> {
         let traits: Box<[_]> = Box::new([Trait::new_slot(variable_name, target_class)]);
         i_class.traits = OnceLock::from(traits);
 
-        let i_class = Class(Gc::new(activation.gc(), i_class));
+        let i_class = Class(ruffle_common::gc_contado!(8, activation.gc(), i_class));
         i_class.init_vtable(activation)?;
 
         // We don't need to construct a c_class

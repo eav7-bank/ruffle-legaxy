@@ -982,20 +982,19 @@ impl<'gc> Value<'gc> {
                         return object.get_property_local(multiname, activation);
                     }
 
-                    if let Some(bound_method) = object.get_bound_method(disp_id) {
-                        return Ok(bound_method.into());
-                    }
-
+                    // Naruto Legaxy: `obj.m` devolve um metodo vinculado TRANSITORIO (nao fica guardado no
+                    // objeto). O compilador do jogo chama metodos de namespace como getproperty + call, e o
+                    // cache por objeto guardava 2 Function + 2 prototype por linha de tabela (~150 MB).
+                    // Igualdade entre vinculados e por valor (FunctionObject::mesmo_vinculo), como no avmplus.
+                    let _ = object;
+                    ruffle_common::contagem_n7::criado(21);
                     let bound_method = vtable
                         .make_bound_method(activation.context, *self, disp_id)
                         .expect("Method should exist");
 
-                    // TODO: Bound methods should be cached on the Method in a
-                    // WeakKeyHashMap<Value, FunctionObject>, not on the Object
-                    object.install_bound_method(activation.gc(), disp_id, bound_method);
-
                     Ok(bound_method.into())
                 } else {
+                    ruffle_common::contagem_n7::criado(21);
                     let bound_method = vtable
                         .make_bound_method(activation.context, *self, disp_id)
                         .expect("Method should exist");
@@ -1332,6 +1331,7 @@ impl<'gc> Value<'gc> {
             return bound_method.call(activation, *self, arguments);
         }
 
+        ruffle_common::contagem_n7::criado(22);
         let bound_method = VTable::bind_method(activation.context, *self, full_method);
 
         // TODO: Bound methods should be cached on the Method in a
@@ -1796,7 +1796,7 @@ impl<'gc> Value<'gc> {
                 if let (Some(self_xml), Some(other_xml)) = (self_xml, other_xml) {
                     E4XNode::ptr_eq(self_xml.node(), other_xml.node())
                 } else {
-                    Object::ptr_eq(*a, *b)
+                    Object::ptr_eq(*a, *b) || funcoes_vinculadas_iguais(*a, *b)
                 }
             }
             _ => false,
@@ -1866,7 +1866,9 @@ impl<'gc> Value<'gc> {
             }
             (Value::String(a), Value::String(b)) => Ok(a == b),
             (Value::Bool(a), Value::Bool(b)) => Ok(a == b),
-            (Value::Object(a), Value::Object(b)) => Ok(Object::ptr_eq(*a, *b)),
+            (Value::Object(a), Value::Object(b)) => {
+                Ok(Object::ptr_eq(*a, *b) || funcoes_vinculadas_iguais(*a, *b))
+            }
             (Value::Undefined, Value::Null) => Ok(true),
             (Value::Null, Value::Undefined) => Ok(true),
             (Value::Number(_) | Value::Integer(_), Value::String(_)) => {
@@ -1980,5 +1982,14 @@ mod tests {
             string_to_f64(WStr::from_units(b"350000000000000000000"), 0, true),
             Some(3.5e20)
         );
+    }
+}
+
+/// Naruto Legaxy: dois metodos vinculados com o mesmo metodo e o mesmo receptor sao iguais (como o
+/// MethodClosure do avmplus), ja que `obj.m` nao fica mais guardado no objeto.
+fn funcoes_vinculadas_iguais<'gc>(a: Object<'gc>, b: Object<'gc>) -> bool {
+    match (a.as_function_object(), b.as_function_object()) {
+        (Some(fa), Some(fb)) => fa.mesmo_vinculo(fb),
+        _ => false,
     }
 }

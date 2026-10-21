@@ -68,7 +68,7 @@ impl<'gc> AvmStringInterner<'gc> {
             |s: &'static [u8]| {
                 let wstr = WStr::from_units(s);
                 let repr = AvmStringRepr::from_raw_static(wstr, true);
-                AvmAtom(interned.insert_fresh_no_hash(mc, Gc::new(mc, repr)))
+                AvmAtom(interned.insert_fresh_no_hash(mc, crate::gc_contado!(2, mc, repr)))
             },
         );
 

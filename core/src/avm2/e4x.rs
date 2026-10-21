@@ -193,7 +193,7 @@ pub enum E4XNodeKind<'gc> {
 
 impl<'gc> E4XNode<'gc> {
     pub fn dummy(mc: &Mutation<'gc>) -> Self {
-        E4XNode(Gc::new(
+        E4XNode(ruffle_common::gc_contado!(13, 
             mc,
             E4XNodeData {
                 parent: Lock::new(None),
@@ -210,7 +210,7 @@ impl<'gc> E4XNode<'gc> {
     }
 
     pub fn text(mc: &Mutation<'gc>, text: AvmString<'gc>, parent: Option<Self>) -> Self {
-        E4XNode(Gc::new(
+        E4XNode(ruffle_common::gc_contado!(13, 
             mc,
             E4XNodeData {
                 parent: Lock::new(parent),
@@ -228,7 +228,7 @@ impl<'gc> E4XNode<'gc> {
         name: AvmString<'gc>,
         parent: Option<Self>,
     ) -> Self {
-        E4XNode(Gc::new(
+        E4XNode(ruffle_common::gc_contado!(13, 
             mc,
             E4XNodeData {
                 parent: Lock::new(parent),
@@ -251,7 +251,7 @@ impl<'gc> E4XNode<'gc> {
         value: AvmString<'gc>,
         parent: Option<E4XNode<'gc>>,
     ) -> Self {
-        E4XNode(Gc::new(
+        E4XNode(ruffle_common::gc_contado!(13, 
             mc,
             E4XNodeData {
                 parent: Lock::new(parent),
@@ -361,7 +361,7 @@ impl<'gc> E4XNode<'gc> {
             },
         };
 
-        let node = E4XNode(Gc::new(
+        let node = E4XNode(ruffle_common::gc_contado!(13, 
             mc,
             E4XNodeData {
                 parent: Lock::new(None),
@@ -844,7 +844,7 @@ impl<'gc> E4XNode<'gc> {
                         text
                     },
                 );
-                let node = E4XNode(Gc::new(
+                let node = E4XNode(ruffle_common::gc_contado!(13, 
                     activation.gc(),
                     E4XNodeData {
                         parent: Lock::new(None),
@@ -957,7 +957,7 @@ impl<'gc> E4XNode<'gc> {
                         .map_err(|_| make_xml_error(activation, XmlErrorCode::ElementMalformed))?;
                     let text = AvmString::new_utf8(activation.gc(), text);
 
-                    let node = E4XNode(Gc::new(
+                    let node = E4XNode(ruffle_common::gc_contado!(13, 
                         activation.gc(),
                         E4XNodeData {
                             parent: Lock::new(None),
@@ -992,7 +992,7 @@ impl<'gc> E4XNode<'gc> {
                             istr!(""),
                         )
                     };
-                    let node = E4XNode(Gc::new(
+                    let node = E4XNode(ruffle_common::gc_contado!(13, 
                         activation.gc(),
                         E4XNodeData {
                             parent: Lock::new(None),
@@ -1093,7 +1093,7 @@ impl<'gc> E4XNode<'gc> {
                 }
             };
 
-            let attribute = E4XNode(Gc::new(
+            let attribute = E4XNode(ruffle_common::gc_contado!(13, 
                 activation.gc(),
                 E4XNodeData {
                     parent: Lock::new(None),
@@ -1142,7 +1142,7 @@ impl<'gc> E4XNode<'gc> {
             }
         };
 
-        let result = E4XNode(Gc::new(
+        let result = E4XNode(ruffle_common::gc_contado!(13, 
             activation.gc(),
             E4XNodeData {
                 parent: Lock::new(None),

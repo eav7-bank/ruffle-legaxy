@@ -30,7 +30,7 @@ impl<'gc> NamespaceSet<'gc> {
     }
 
     pub fn multiple(set: Vec<Namespace<'gc>>, mc: &Mutation<'gc>) -> Self {
-        Self::Multiple(Gc::new(mc, set))
+        Self::Multiple(ruffle_common::gc_contado!(7, mc, set))
     }
     pub fn single(ns: Namespace<'gc>) -> Self {
         Self::Single(ns)

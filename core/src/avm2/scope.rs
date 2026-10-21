@@ -104,7 +104,7 @@ impl<'gc> ScopeChain<'gc> {
                 let mut cloned = (*scopes).clone();
                 cloned.extend_from_slice(new_scopes);
                 Self {
-                    scopes: Some(Gc::new(mc, cloned)),
+                    scopes: Some(ruffle_common::gc_contado!(10, mc, cloned)),
                     domain: self.domain,
                 }
             }
@@ -112,7 +112,7 @@ impl<'gc> ScopeChain<'gc> {
                 // We are chaining on top of an empty ScopeChain, so we don't actually
                 // need to chain anything.
                 Self {
-                    scopes: Some(Gc::new(mc, new_scopes.to_vec())),
+                    scopes: Some(ruffle_common::gc_contado!(10, mc, new_scopes.to_vec())),
                     domain: self.domain,
                 }
             }

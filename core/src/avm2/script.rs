@@ -105,7 +105,7 @@ impl<'gc> TranslationUnit<'gc> {
             abc: Rc::new(abc),
         };
 
-        Self(Gc::new(mc, this))
+        Self(ruffle_common::gc_contado!(12, mc, this))
     }
 
     pub fn load_classes(self, activation: &mut Activation<'_, 'gc>) -> Result<(), Error<'gc>> {
@@ -351,7 +351,7 @@ impl<'gc> TranslationUnit<'gc> {
         let write = Gc::write(activation.gc(), self.0);
         let multinames = field!(write, TranslationUnitData, multinames).as_deref();
         let multiname = Multiname::from_abc_index(activation, self, multiname_index)?;
-        let multiname = Gc::new(activation.gc(), multiname);
+        let multiname = ruffle_common::gc_contado!(7, activation.gc(), multiname);
         multinames[idx].unlock().set(multiname).unwrap();
         Ok(multiname)
     }
@@ -565,7 +565,7 @@ impl<'gc> Script<'gc> {
 
         let globals = Script::create_globals_object(unit, script, domain, init, activation)?;
 
-        let created_script = Self(Gc::new(
+        let created_script = Self(ruffle_common::gc_contado!(12, 
             activation.gc(),
             ScriptData {
                 globals,

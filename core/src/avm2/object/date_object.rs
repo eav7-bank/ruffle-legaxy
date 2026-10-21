@@ -15,7 +15,7 @@ pub fn date_allocator<'gc>(
     class: ClassObject<'gc>,
     activation: &mut Activation<'_, 'gc>,
 ) -> Result<Object<'gc>, Error<'gc>> {
-    Ok(DateObject(Gc::new(
+    Ok(DateObject(ruffle_common::gc_contado!(17, 
         activation.gc(),
         DateObjectData {
             base: ScriptObjectData::new(class),
@@ -48,7 +48,7 @@ impl<'gc> DateObject<'gc> {
         let class = context.avm2.classes().date;
         let base = ScriptObjectData::new(class);
 
-        DateObject(Gc::new(
+        DateObject(ruffle_common::gc_contado!(17, 
             context.gc(),
             DateObjectData {
                 base,
@@ -69,7 +69,7 @@ impl<'gc> DateObject<'gc> {
             date_class.instance_vtable(),
         );
 
-        let instance: Object<'gc> = DateObject(Gc::new(
+        let instance: Object<'gc> = DateObject(ruffle_common::gc_contado!(17, 
             context.gc(),
             DateObjectData {
                 base,

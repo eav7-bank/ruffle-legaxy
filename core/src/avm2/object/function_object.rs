@@ -70,7 +70,7 @@ impl<'gc> FunctionObject<'gc> {
 
         let es3_proto = ScriptObject::new_object(context);
 
-        let function_object = FunctionObject(Gc::new(
+        let function_object = FunctionObject(ruffle_common::gc_contado!(5, 
             context.gc(),
             FunctionObjectData {
                 base: ScriptObjectData::new(fn_class),
@@ -86,6 +86,47 @@ impl<'gc> FunctionObject<'gc> {
         es3_proto.set_local_property_is_enumerable(context.gc(), constructor_prop, false);
 
         function_object
+    }
+
+    /// Naruto Legaxy: metodo vinculado a um receptor SEM objeto `prototype` (um MethodClosure nao
+    /// tem prototype util; o Ruffle criava um ScriptObject + tabela de propriedades por vinculo).
+    pub fn from_method_vinculado(
+        context: &mut UpdateContext<'gc>,
+        method: Method<'gc>,
+        scope: ScopeChain<'gc>,
+        receiver: Value<'gc>,
+        bound_superclass_object: Option<ClassObject<'gc>>,
+    ) -> FunctionObject<'gc> {
+        let fn_class = context.avm2.classes().function;
+        let exec = BoundMethod::from_method(method, scope, Some(receiver), bound_superclass_object);
+
+        FunctionObject(ruffle_common::gc_contado!(
+            5,
+            context.gc(),
+            FunctionObjectData {
+                base: ScriptObjectData::new(fn_class),
+                exec,
+                prototype: Lock::new(None),
+            },
+        ))
+    }
+
+    /// Naruto Legaxy: igualdade por valor de metodos vinculados (mesmo metodo e mesmo receptor),
+    /// como o avmplus faz com MethodClosure. `obj.m` nao fica mais guardado no objeto.
+    pub fn mesmo_vinculo(self, other: FunctionObject<'gc>) -> bool {
+        if std::ptr::eq(self.as_ptr(), other.as_ptr()) {
+            return true;
+        }
+        match (self.0.exec.vinculo(), other.0.exec.vinculo()) {
+            (Some((ma, ra)), Some((mb, rb))) => {
+                ma == mb
+                    && match (ra, rb) {
+                        (Value::Object(a), Value::Object(b)) => Object::ptr_eq(a, b),
+                        (a, b) => a.strict_eq(&b),
+                    }
+            }
+            _ => false,
+        }
     }
 
     pub fn call(

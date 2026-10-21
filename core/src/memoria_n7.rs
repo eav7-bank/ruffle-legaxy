@@ -466,3 +466,8 @@ fn foto_do_pico() {
     FOTO_PICO[12].store(BYTEARRAY_BYTES.load(r) as u64, r);
     FOTO_PICO[13].store(QUADROS_EXECUTADOS.load(r), r);
 }
+
+/// Objetos de GC criados por tipo (ruffle_common::contagem_n7).
+pub fn criados(i: usize) -> u64 {
+    ruffle_common::contagem_n7::criados(i)
+}

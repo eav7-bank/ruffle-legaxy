@@ -219,7 +219,7 @@ impl<'gc> Method<'gc> {
             }
         };
 
-        Ok(Self(Gc::new(
+        Ok(Self(ruffle_common::gc_contado!(6, 
             activation.gc(),
             MethodData {
                 txunit,

@@ -22,7 +22,7 @@ pub fn array_allocator<'gc>(
 ) -> Result<Object<'gc>, Error<'gc>> {
     let base = ScriptObjectData::new(class);
 
-    Ok(ArrayObject(Gc::new(
+    Ok(ArrayObject(ruffle_common::gc_contado!(3, 
         activation.gc(),
         ArrayObjectData {
             base,
@@ -76,7 +76,7 @@ impl<'gc> ArrayObject<'gc> {
         let class = context.avm2.classes().array;
         let base = ScriptObjectData::new(class);
 
-        ArrayObject(Gc::new(
+        ArrayObject(ruffle_common::gc_contado!(3, 
             context.gc(),
             ArrayObjectData {
                 base,
@@ -96,7 +96,7 @@ impl<'gc> ArrayObject<'gc> {
             array_class.instance_vtable(),
         );
 
-        ArrayObject(Gc::new(
+        ArrayObject(ruffle_common::gc_contado!(3, 
             context.gc(),
             ArrayObjectData {
                 base,

@@ -1145,6 +1145,7 @@ impl<'a, 'gc> Activation<'a, 'gc> {
         // TODO: Use the correct scope
         let scope = self.create_scopechain();
 
+        ruffle_common::contagem_n7::criado(20);
         let function =
             FunctionObject::from_method(self.context, method, scope, None, superclass_object);
         let value = function.call(self, receiver, args)?;
@@ -1769,6 +1770,7 @@ impl<'a, 'gc> Activation<'a, 'gc> {
         // Create the activation object. Activation objects don't have prototypes,
         // and we can give it the Class's vtable because `Class::for_activation`
         // ensures there are only slots on the vtable.
+        ruffle_common::contagem_n7::criado(1);
         let instance = ScriptObject::custom_object(
             self.gc(),
             activation_class,

@@ -28,7 +28,7 @@ pub fn xml_allocator<'gc>(
 ) -> Result<Object<'gc>, Error<'gc>> {
     let base = ScriptObjectData::new(class);
 
-    Ok(XmlObject(Gc::new(
+    Ok(XmlObject(ruffle_common::gc_contado!(16, 
         activation.gc(),
         XmlObjectData {
             base,
@@ -72,7 +72,7 @@ pub enum NotificationCommand {
 
 impl<'gc> XmlObject<'gc> {
     pub fn new(node: E4XNode<'gc>, activation: &mut Activation<'_, 'gc>) -> Self {
-        XmlObject(Gc::new(
+        XmlObject(ruffle_common::gc_contado!(16, 
             activation.gc(),
             XmlObjectData {
                 base: ScriptObjectData::new(activation.context.avm2.classes().xml),

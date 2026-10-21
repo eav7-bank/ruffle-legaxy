@@ -31,7 +31,7 @@ pub fn xml_list_allocator<'gc>(
 ) -> Result<Object<'gc>, Error<'gc>> {
     let base = ScriptObjectData::new(class);
 
-    Ok(XmlListObject(Gc::new(
+    Ok(XmlListObject(ruffle_common::gc_contado!(16, 
         activation.gc(),
         XmlListObjectData {
             base,
@@ -78,7 +78,7 @@ impl<'gc> XmlListObject<'gc> {
         target_property: Option<Multiname<'gc>>,
     ) -> XmlListObject<'gc> {
         let base = ScriptObjectData::new(activation.context.avm2.classes().xml_list);
-        XmlListObject(Gc::new(
+        XmlListObject(ruffle_common::gc_contado!(16, 
             activation.gc(),
             XmlListObjectData {
                 base,

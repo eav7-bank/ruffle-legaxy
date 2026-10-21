@@ -1474,6 +1474,7 @@ pub fn n7_memoria(i: u32) -> f64 {
         41 => m::VIGIADAS.load(Relaxed) as f64,
         42 => m::LEITURAS_COMPACTAS.load(Relaxed) as f64,
         43..=56 => m::FOTO_PICO[(i - 43) as usize].load(Relaxed) as f64,
+        57..=80 => m::criados((i - 57) as usize) as f64,
         _ => -1.0,
     }
 }

@@ -72,7 +72,7 @@ impl<'gc> ClassBoundMethod<'gc> {
 
 impl<'gc> VTable<'gc> {
     pub fn empty(mc: &Mutation<'gc>) -> Self {
-        VTable(Gc::new(mc, VTableData::default()))
+        VTable(ruffle_common::gc_contado!(9, mc, VTableData::default()))
     }
 
     /// Builds a new vtable by calculating the flattened list of instance traits
@@ -90,7 +90,7 @@ impl<'gc> VTable<'gc> {
             scope,
             superclass_vtable,
         )?;
-        Ok(VTable(Gc::new(mc, this)))
+        Ok(VTable(ruffle_common::gc_contado!(9, mc, this)))
     }
 
     /// Like `VTable::new`, but also copies properties from the defining class' interfaces.
@@ -109,7 +109,7 @@ impl<'gc> VTable<'gc> {
         )?;
         Self::copy_interface_properties(&mut this, defining_class_def, context);
 
-        Ok(VTable(Gc::new(context.gc(), this)))
+        Ok(VTable(ruffle_common::gc_contado!(9, context.gc(), this)))
     }
 
     pub fn resolved_traits(self) -> &'gc PropertyMap<'gc, Property> {
@@ -588,11 +588,11 @@ impl<'gc> VTable<'gc> {
         receiver: Value<'gc>,
         method: &ClassBoundMethod<'gc>,
     ) -> FunctionObject<'gc> {
-        FunctionObject::from_method(
+        FunctionObject::from_method_vinculado(
             context,
             method.method,
             method.scope(),
-            Some(receiver),
+            receiver,
             method.super_class_obj,
         )
     }
